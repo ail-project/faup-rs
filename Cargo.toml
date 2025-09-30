@@ -5,3 +5,4 @@ resolver = "3"
 [workspace.package]
 license = "GPLv3"
 repository = "https://github.com/ail-project/faup-rs"
+readme = "README.md"
