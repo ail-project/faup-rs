@@ -1,0 +1,11 @@
+[package]
+name = "faup-rs"
+version = "0.1.0"
+edition = "2024"
+readme.workspace = true
+
+[dependencies]
+pest = "2.8.2"
+pest_derive = "2.8.2"
+psl = "2.1.145"
+thiserror = "2.0.16"

@@ -1,0 +1,13 @@
+[package]
+name = "pyfaup-rs"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "pyfaup"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.26.0", features = ["extension-module"] }
+faup-rs = { path = "../faup" }
