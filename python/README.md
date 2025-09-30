@@ -32,7 +32,7 @@ pip install pyfaup-rs
 1. Clone the repository:
    ```bash
    git clone https://github.com/ail-project/faup-rs.git
-   cd faup-rs
+   cd faup-rs/python
    ```
 2. Install using `maturin`:
    ```bash
