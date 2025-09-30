@@ -2,6 +2,10 @@
 
 # faup-rs: Fast URL Parser for Rust
 
+[![Crates.io Version](https://img.shields.io/crates/v/faup-rs?style=for-the-badge&color=orange)](https://crates.io/crates/faup-rs)
+[![docs.rs](https://img.shields.io/docsrs/faup-rs?style=for-the-badge&logo=docs.rs&color=blue)](https://docs.rs/faup-rs)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ail-project/faup-rs/rust.yml?style=for-the-badge)
+
 A high-performance, zero-allocation URL parser for Rust that handles:
 - Hostnames (with subdomains, custom TLDs, and IDNs)
 - IPv4/IPv6 addresses
