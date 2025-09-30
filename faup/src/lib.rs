@@ -10,9 +10,13 @@
 //! ## Features
 //!
 //! ✅ **Zero-allocation parsing**: Borrows input strings where possible
+//!
 //! ✅ **Public Suffix List (PSL)**: Correctly identifies domain suffixes
+//!
 //! ✅ **Custom TLDs**: Extendable via the `CUSTOM_TLDS` constant
+//!
 //! ✅ **Comprehensive error handling**: Clear, actionable error types
+//!
 //! ✅ **UTF-8 support**: Full Unicode handling for all URL components
 //!
 //! ## Installation
