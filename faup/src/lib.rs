@@ -643,39 +643,6 @@ impl<'url> Url<'url> {
         })
     }
 
-    /// Converts this borrowed `Url` into an owned `Url`.
-    ///
-    /// This is useful when you need to store the `Url` for longer than the lifetime of the input string.
-    ///
-    /// # Performance
-    ///
-    /// When using this method strings will be cloned.
-    ///
-    /// # Returns
-    ///
-    /// * `Url<'owned>` - An owned version of the URL.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use faup_rs::Url;
-    ///
-    /// let url = Url::parse("https://example.com").unwrap();
-    /// let owned_url = url.into_owned();
-    /// ```
-    pub fn into_owned<'owned>(self) -> Url<'owned> {
-        Url {
-            orig: Cow::Owned(self.orig.into_owned()),
-            scheme: Cow::Owned(self.scheme.into_owned()),
-            userinfo: self.userinfo.map(|u| u.into_owned()),
-            host: self.host.into_owned(),
-            port: self.port,
-            path: self.path.map(|p| Cow::Owned(p.into_owned())),
-            query: self.query.map(|q| Cow::Owned(q.into_owned())),
-            fragment: self.fragment.map(|f| Cow::Owned(f.into_owned())),
-        }
-    }
-
     /// Creates a new `Url` by parsing a string slice.
     ///
     /// # Arguments
@@ -951,6 +918,39 @@ impl<'url> Url<'url> {
     #[inline(always)]
     pub fn fragment(&self) -> Option<&str> {
         self.fragment.as_ref().map(|p| p.as_ref())
+    }
+
+    /// Converts this borrowed `Url` into an owned `Url`.
+    ///
+    /// This is useful when you need to store the `Url` for longer than the lifetime of the input string.
+    ///
+    /// # Performance
+    ///
+    /// When using this method strings will be cloned.
+    ///
+    /// # Returns
+    ///
+    /// * `Url<'owned>` - An owned version of the URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Url;
+    ///
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// let owned_url = url.into_owned();
+    /// ```
+    pub fn into_owned<'owned>(self) -> Url<'owned> {
+        Url {
+            orig: Cow::Owned(self.orig.into_owned()),
+            scheme: Cow::Owned(self.scheme.into_owned()),
+            userinfo: self.userinfo.map(|u| u.into_owned()),
+            host: self.host.into_owned(),
+            port: self.port,
+            path: self.path.map(|p| Cow::Owned(p.into_owned())),
+            query: self.query.map(|q| Cow::Owned(q.into_owned())),
+            fragment: self.fragment.map(|f| Cow::Owned(f.into_owned())),
+        }
     }
 }
 
