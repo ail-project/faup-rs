@@ -1,0 +1,26 @@
+url    = ${ SOI ~ scheme ~ "://" ~ userinfo? ~ host ~ (":" ~ port)? ~ path? ~ query? ~ fragment? ~ EOI }
+scheme =  { ASCII_ALPHANUMERIC+ }
+
+username = ${ (!(":" | "@" | WHITE_SPACE) ~ ANY)+ }
+password = ${ (!("@" | WHITE_SPACE) ~ ANY)+ }
+userinfo = ${ username ~ (":" ~ password)? ~ "@" }
+
+host        = ${ ipv4 | ipv6 | hostname }
+domain_part = ${ (!(":" | "?" | "/" | "#" | "." | WHITE_SPACE) ~ ANY)+ }
+tld         = ${ (!(":" | "?" | "/" | "#" | WHITE_SPACE) ~ ANY)+ }
+hostname    = ${ (((domain_part ~ ".")+ ~ tld) | domain_part) }
+
+ipv4 = ${ (ASCII_DIGIT{1, 3} ~ "."){3} ~ ASCII_DIGIT{1, 3} }
+ipv6 = ${ "[" ~ (ASCII_HEX_DIGIT{,4} ~ ":"){2, 7} ~ ASCII_HEX_DIGIT{,4} ~ "]" }
+
+encoded_char = ${ "%" ~ ASCII_DIGIT{2} }
+
+port = ${ ASCII_ALPHANUMERIC{,5} }
+
+path_segment = ${ (encoded_char | (!("?" | "/" | "#" | WHITE_SPACE) ~ ANY))* }
+path         = ${ ("/" ~ path_segment)+ }
+
+query_param = ${ (!("=") ~ ANY)+ ~ "=" ~ (encoded_char | (!("?" | "/" | "#") ~ ANY))* }
+query       = ${ "?" ~ (query_param ~ "&")* ~ query_param? }
+
+fragment = ${ "#" ~ (encoded_char | ANY)* }
