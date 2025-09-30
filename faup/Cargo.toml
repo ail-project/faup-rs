@@ -2,7 +2,13 @@
 name = "faup-rs"
 version = "0.1.0"
 edition = "2024"
+description = "Zero-allocation URL parser for Rust"
+keywords = ["url", "parser", "zero-allocation"]
+authors.workspace = true
 readme.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version = "1.85.1"
 
 [dependencies]
 pest = "2.8.2"

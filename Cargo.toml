@@ -3,6 +3,7 @@ members = ["faup", "python"]
 resolver = "3"
 
 [workspace.package]
-license = "GPLv3"
+authors = ["quentin.jerome@circl.lu"]
 repository = "https://github.com/ail-project/faup-rs"
 readme = "README.md"
+license = "GPLv3"
