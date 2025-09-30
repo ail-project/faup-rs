@@ -1,6 +1,6 @@
 <!-- cargo-rdme start -->
 
-# Faup-rs: Fast URL Parser for Rust
+# faup-rs: Fast URL Parser for Rust
 
 A high-performance, zero-allocation URL parser for Rust that handles:
 - Hostnames (with subdomains, custom TLDs, and IDNs)
