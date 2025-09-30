@@ -146,7 +146,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist -m python/Cargo.toml -m python/Cargo.toml
+          args: --out dist -m python/Cargo.toml
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
