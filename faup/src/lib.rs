@@ -11,6 +11,18 @@ use thiserror::Error;
 
 static CUSTOM_TLDS: &[&str] = &["b32.i2p"];
 
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("invalid port")]
+    InvalidPort,
+    #[error("invalid ipv4 address")]
+    InvalidIPv4,
+    #[error("invalid ipv6 address")]
+    InvalidIPv6,
+    #[error("parser error: {0}")]
+    Parse(#[from] Box<pest::error::Error<Rule>>),
+}
+
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 pub(crate) struct UrlParser;
@@ -443,16 +455,10 @@ pub struct Url<'url> {
     fragment: Option<Cow<'url, str>>,
 }
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("invalid port")]
-    InvalidPort,
-    #[error("invalid ipv4 address")]
-    InvalidIPv4,
-    #[error("invalid ipv6 address")]
-    InvalidIPv6,
-    #[error("parser error: {0}")]
-    Parse(#[from] Box<pest::error::Error<Rule>>),
+impl fmt::Display for Url<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 impl<'url> Url<'url> {
@@ -867,9 +873,9 @@ mod tests {
         ];
 
         for url in test_urls {
-            println!("Testing: {}", url);
+            println!("Testing: {url}");
             let _ = Url::parse(url)
-                .inspect_err(|e| println!("Error parsing '{}': {}", url, e))
+                .inspect_err(|e| println!("Error parsing '{url}': {e}"))
                 .unwrap();
         }
     }
