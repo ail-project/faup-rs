@@ -6,4 +6,4 @@ resolver = "3"
 authors = ["quentin.jerome@circl.lu"]
 repository = "https://github.com/ail-project/faup-rs"
 readme = "README.md"
-license = "GPLv3"
+license = "GPL-3.0"
