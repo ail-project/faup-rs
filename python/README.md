@@ -24,7 +24,7 @@
 ### Install from PyPI
 
 ```bash
-pip install python
+pip install pyfaup-rs
 ```
 
 ### Install from Source
