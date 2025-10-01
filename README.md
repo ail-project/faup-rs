@@ -110,4 +110,8 @@ for url_str in urls {
 
 This project is licensed under the GNU General Public License v3.0 (GPLv3)..
 
+## Acknowledgement
+
+Thanks to Sebastien Tricaud for [the original work on faup](https://github.com/stricaud/faup).
+
 <!-- cargo-rdme end -->
