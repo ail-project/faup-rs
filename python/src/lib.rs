@@ -43,6 +43,8 @@ impl From<Error> for PyErr {
 #[pyclass]
 pub struct Url {
     #[pyo3(get)]
+    pub orig: String,
+    #[pyo3(get)]
     pub scheme: String,
     #[pyo3(get)]
     pub username: Option<String>,
@@ -91,6 +93,7 @@ impl From<faup_rs::Url<'_>> for Url {
         };
 
         Self {
+            orig: value.to_string(),
             scheme: value.scheme().into(),
             username,
             password,
@@ -140,6 +143,7 @@ impl Url {
             .map(|u| u.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
+
 }
 
 /// A compatibility class that mimics the FAUP (Fast URL Parser) Python API.
@@ -233,6 +237,57 @@ impl FaupCompat {
 
         Ok(m)
     }
+
+    fn get_credential(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.credentials())?)
+    }
+
+    fn get_domain(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.domain.clone())?)
+    }
+
+    fn get_subdomain(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.subdomain.clone())?)
+    }
+
+    fn get_fragment(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.fragment.clone())?)
+    }
+
+    fn get_host(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.map(|u| u.host.clone())?)
+    }
+
+    fn get_resource_path(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.path.clone())?)
+    }
+
+    fn get_tld(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.suffix.clone())?)
+    }
+
+    fn get_query_string(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.and_then(|u| u.query.clone())?)
+    }
+
+    fn get_scheme(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        Some(url.map(|u| u.scheme.clone())?)
+    }
+
+    fn get_port(&self) -> Option<u16> {
+        let url = self.url.as_ref();
+        Some(url.map(|u| u.port)??)
+    }
+
 }
 
 /// A Python module implemented in Rust for URL parsing.
