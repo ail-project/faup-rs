@@ -256,8 +256,7 @@ impl FaupCompat {
     }
 
     fn get_host(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.map(|u| u.host.clone())?)
+        Some(self.url.as_ref()?.host.clone())
     }
 
     fn get_resource_path(&self) -> Option<&str> {
@@ -273,12 +272,22 @@ impl FaupCompat {
     }
 
     fn get_scheme(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.map(|u| u.scheme.clone())?)
+        Some(self.url.as_ref()?.scheme.clone())
     }
 
     fn get_port(&self) -> Option<u16> {
         self.url.as_ref()?.port
+    }
+
+    fn get_domain_without_tld(&self) -> Option<&str> {
+        let domain = self.url.as_ref()?.domain.as_deref().clone();
+        let tld = self.url.as_ref()?.suffix.as_deref();
+        if domain.is_some() && tld.is_some() {
+            Some(&domain?[0..domain?.chars().count() - tld?.chars().count() - 1])
+        }
+        else {
+            None
+        }
     }
 
 }
