@@ -243,19 +243,16 @@ impl FaupCompat {
         Some(url.and_then(|u| u.credentials())?)
     }
 
-    fn get_domain(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.and_then(|u| u.domain.clone())?)
+    fn get_domain(&self) -> Option<&str> {
+        self.url.as_ref()?.domain.as_deref()
     }
 
-    fn get_subdomain(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.and_then(|u| u.subdomain.clone())?)
+    fn get_subdomain(&self) -> Option<&str> {
+        self.url.as_ref()?.subdomain.as_deref()
     }
 
-    fn get_fragment(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.and_then(|u| u.fragment.clone())?)
+    fn get_fragment(&self) -> Option<&str> {
+        self.url.as_ref()?.fragment.as_deref()
     }
 
     fn get_host(&self) -> Option<String> {
@@ -263,19 +260,16 @@ impl FaupCompat {
         Some(url.map(|u| u.host.clone())?)
     }
 
-    fn get_resource_path(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.and_then(|u| u.path.clone())?)
+    fn get_resource_path(&self) -> Option<&str> {
+        self.url.as_ref()?.path.as_deref()
     }
 
-    fn get_tld(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.and_then(|u| u.suffix.clone())?)
+    fn get_tld(&self) -> Option<&str> {
+        self.url.as_ref()?.suffix.as_deref()
     }
 
-    fn get_query_string(&self) -> Option<String> {
-        let url = self.url.as_ref();
-        Some(url.and_then(|u| u.query.clone())?)
+    fn get_query_string(&self) -> Option<&str> {
+        self.url.as_ref()?.query.as_deref()
     }
 
     fn get_scheme(&self) -> Option<String> {
@@ -284,8 +278,7 @@ impl FaupCompat {
     }
 
     fn get_port(&self) -> Option<u16> {
-        let url = self.url.as_ref();
-        Some(url.map(|u| u.port)??)
+        self.url.as_ref()?.port
     }
 
 }
