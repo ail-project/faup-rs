@@ -255,8 +255,8 @@ impl FaupCompat {
         self.url.as_ref()?.fragment.as_deref()
     }
 
-    fn get_host(&self) -> Option<String> {
-        Some(self.url.as_ref()?.host.clone())
+    fn get_host(&self) -> Option<&str> {
+        self.url.as_ref().map(|u| u.host.as_str())
     }
 
     fn get_resource_path(&self) -> Option<&str> {
@@ -271,8 +271,8 @@ impl FaupCompat {
         self.url.as_ref()?.query.as_deref()
     }
 
-    fn get_scheme(&self) -> Option<String> {
-        Some(self.url.as_ref()?.scheme.clone())
+    fn get_scheme(&self) -> Option<&str> {
+        self.url.as_ref().map(|u| u.scheme.as_str())
     }
 
     fn get_port(&self) -> Option<u16> {
