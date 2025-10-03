@@ -240,7 +240,7 @@ impl FaupCompat {
 
     fn get_credential(&self) -> Option<String> {
         let url = self.url.as_ref();
-        Some(url.and_then(|u| u.credentials())?)
+        url.and_then(|u| u.credentials())
     }
 
     fn get_domain(&self) -> Option<&str> {
@@ -280,7 +280,7 @@ impl FaupCompat {
     }
 
     fn get_domain_without_tld(&self) -> Option<&str> {
-        let domain = self.url.as_ref()?.domain.as_deref().clone();
+        let domain = self.url.as_ref()?.domain.as_deref();
         let tld = self.url.as_ref()?.suffix.as_deref();
         if domain.is_some() && tld.is_some() {
             Some(&domain?[0..domain?.chars().count() - tld?.chars().count() - 1])
