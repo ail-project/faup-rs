@@ -280,10 +280,10 @@ impl FaupCompat {
     }
 
     fn get_domain_without_tld(&self) -> Option<&str> {
-        let domain = self.url.as_ref()?.domain.as_deref();
-        let tld = self.url.as_ref()?.suffix.as_deref();
-        if domain.is_some() && tld.is_some() {
-            Some(&domain?[0..domain?.chars().count() - tld?.chars().count() - 1])
+        if let (Some(domain), Some(tld)) = (self.get_domain(), self.get_tld()) {
+            domain
+                .strip_suffix(tld)
+                .and_then(|dom| dom.strip_suffix('.'))
         }
         else {
             None
