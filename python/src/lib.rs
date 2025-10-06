@@ -43,6 +43,8 @@ impl From<Error> for PyErr {
 #[pyclass]
 pub struct Url {
     #[pyo3(get)]
+    pub orig: String,
+    #[pyo3(get)]
     pub scheme: String,
     #[pyo3(get)]
     pub username: Option<String>,
@@ -91,6 +93,7 @@ impl From<faup_rs::Url<'_>> for Url {
         };
 
         Self {
+            orig: value.as_str().into(),
             scheme: value.scheme().into(),
             username,
             password,
@@ -140,6 +143,7 @@ impl Url {
             .map(|u| u.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
+
 }
 
 /// A compatibility class that mimics the FAUP (Fast URL Parser) Python API.
@@ -233,6 +237,59 @@ impl FaupCompat {
 
         Ok(m)
     }
+
+    fn get_credential(&self) -> Option<String> {
+        let url = self.url.as_ref();
+        url.and_then(|u| u.credentials())
+    }
+
+    fn get_domain(&self) -> Option<&str> {
+        self.url.as_ref()?.domain.as_deref()
+    }
+
+    fn get_subdomain(&self) -> Option<&str> {
+        self.url.as_ref()?.subdomain.as_deref()
+    }
+
+    fn get_fragment(&self) -> Option<&str> {
+        self.url.as_ref()?.fragment.as_deref()
+    }
+
+    fn get_host(&self) -> Option<&str> {
+        self.url.as_ref().map(|u| u.host.as_str())
+    }
+
+    fn get_resource_path(&self) -> Option<&str> {
+        self.url.as_ref()?.path.as_deref()
+    }
+
+    fn get_tld(&self) -> Option<&str> {
+        self.url.as_ref()?.suffix.as_deref()
+    }
+
+    fn get_query_string(&self) -> Option<&str> {
+        self.url.as_ref()?.query.as_deref()
+    }
+
+    fn get_scheme(&self) -> Option<&str> {
+        self.url.as_ref().map(|u| u.scheme.as_str())
+    }
+
+    fn get_port(&self) -> Option<u16> {
+        self.url.as_ref()?.port
+    }
+
+    fn get_domain_without_tld(&self) -> Option<&str> {
+        if let (Some(domain), Some(tld)) = (self.get_domain(), self.get_tld()) {
+            domain
+                .strip_suffix(tld)
+                .and_then(|dom| dom.strip_suffix('.'))
+        }
+        else {
+            None
+        }
+    }
+
 }
 
 /// A Python module implemented in Rust for URL parsing.
