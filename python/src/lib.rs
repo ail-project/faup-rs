@@ -93,7 +93,7 @@ impl From<faup_rs::Url<'_>> for Url {
         };
 
         Self {
-            orig: value.to_string(),
+            orig: value.as_str().into(),
             scheme: value.scheme().into(),
             username,
             password,
