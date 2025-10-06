@@ -12,6 +12,8 @@ class TestPyFaupRR(unittest.TestCase):
     def test_url(self) -> None:
         parsed_url = Url('https://user:pass@sub.example.com:8080/path?query=value#fragment')
 
+        self.assertEqual(parsed_url.orig, 'https://user:pass@sub.example.com:8080/path?query=value#fragment')
+
         self.assertEqual(parsed_url.scheme, 'https')
         self.assertEqual(parsed_url.username, 'user')
         self.assertEqual(parsed_url.password, 'pass')
