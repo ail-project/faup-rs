@@ -115,3 +115,9 @@ This project is licensed under the GNU General Public License v3.0 (GPLv3)..
 Thanks to Sebastien Tricaud for [the original work on faup](https://github.com/stricaud/faup).
 
 <!-- cargo-rdme end -->
+
+# Funding
+
+Faup-rs is co-funded by [CIRCL](https://www.circl.lu/) and by the European Union under [FETTA](https://www.circl.lu/pub/press/20240131/) (Federated European Team for Threat Analysis) project.
+
+![EU logo](assets/eu-funded-en.svg)
