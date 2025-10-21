@@ -597,15 +597,18 @@ impl<'url> Url<'url> {
                     let host_pair = p.into_inner().next().unwrap();
                     match host_pair.as_rule() {
                         Rule::hostname => {
-                            host = Some(Host::Hostname(Hostname::from_str(host_pair.as_str())))
-                        }
-                        Rule::ipv4 => {
-                            host = Some(
-                                Ipv4Addr::from_str(host_pair.as_str())
-                                    .map(IpAddr::from)
-                                    .map(Host::Ip)
-                                    .map_err(|_| Error::InvalidIPv4)?,
-                            );
+                            if let Ok(ipv4) =
+                                UrlParser::parse(Rule::ipv4, host_pair.as_str()).map(|p| p.as_str())
+                            {
+                                host = Some(
+                                    Ipv4Addr::from_str(ipv4)
+                                        .map(IpAddr::from)
+                                        .map(Host::Ip)
+                                        .map_err(|_| Error::InvalidIPv4)?,
+                                );
+                            } else {
+                                host = Some(Host::Hostname(Hostname::from_str(host_pair.as_str())))
+                            }
                         }
 
                         Rule::ipv6 => {
@@ -984,6 +987,7 @@ mod tests {
             "http://full.custom-tld.test.b32.i2p",
             "https://alex:adore-la-quiche@avec-des-œufs.be#et-des-lardons",
             "https://%40lex:adore:la:quiche@%61vec-des-œufs.be/../../..some/directory/traversal/../#et-des-lardons",
+            "https://44.129.205.92.host.secureserver.net",
         ];
 
         for url in test_urls {
