@@ -5,12 +5,14 @@ username = ${ (!(":" | "@" | WHITE_SPACE) ~ ANY)+ }
 password = ${ (!("@" | WHITE_SPACE) ~ ANY)+ }
 userinfo = ${ username ~ (":" ~ password)? ~ "@" }
 
-host        = ${ ipv4 | ipv6 | hostname }
+// this rule is used to check if the hostname is actually
+// a valid ipv4 address as hostname rule matches any ipv4
+ipv4        = ${ SOI ~ (ASCII_DIGIT{1, 3} ~ "."){3} ~ ASCII_DIGIT{1, 3} ~ EOI }
+host        = ${ ipv6 | hostname }
 domain_part = ${ (!(":" | "?" | "/" | "#" | "." | WHITE_SPACE) ~ ANY)+ }
 tld         = ${ (!(":" | "?" | "/" | "#" | WHITE_SPACE) ~ ANY)+ }
 hostname    = ${ (((domain_part ~ ".")+ ~ tld) | domain_part) }
 
-ipv4 = ${ (ASCII_DIGIT{1, 3} ~ "."){3} ~ ASCII_DIGIT{1, 3} }
 ipv6 = ${ "[" ~ (ASCII_HEX_DIGIT{,4} ~ ":"){2, 7} ~ ASCII_HEX_DIGIT{,4} ~ "]" }
 
 encoded_char = ${ "%" ~ ASCII_DIGIT{2} }
