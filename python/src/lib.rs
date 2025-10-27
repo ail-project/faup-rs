@@ -16,6 +16,23 @@ impl From<Error> for PyErr {
     }
 }
 
+/// Represents a parsed hostname (domain name) with subdomain, domain, and suffix components.
+///
+/// # Attributes
+///
+/// * `hostname` - `str` - The full hostname.
+/// * `subdomain` - `Optional[str]` - The subdomain part, if present.
+/// * `domain` - `Optional[str]` - The domain part, if present.
+/// * `suffix` - `Optional[str]` - The suffix (TLD) part, if present.
+///
+/// # Example
+///
+///     >>> from pyfaup import Hostname
+///     >>> hn = Hostname("sub.example.com")
+///     >>> print(hn.hostname)  # "sub.example.com"
+///     >>> print(hn.subdomain)  # "sub"
+///     >>> print(hn.domain)     # "example"
+///     >>> print(hn.suffix)     # "com"
 #[pyclass]
 #[derive(Clone)]
 pub struct Hostname {
@@ -41,6 +58,30 @@ impl From<faup_rs::Hostname<'_>> for Hostname {
 
 #[pymethods]
 impl Hostname {
+    /// Creates a new [`Hostname`] by parsing a hostname string.
+    ///
+    /// # Arguments
+    ///
+    /// * `hn` - `str` - The hostname string to parse.
+    ///
+    /// # Returns
+    ///
+    /// * [`Hostname`] - The parsed hostname.
+    ///
+    /// # Raises
+    ///
+    /// * [`ValueError`] - If the input is not a valid hostname.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Hostname
+    ///     >>> hn = Hostname("sub.example.com")
+    ///     >>> print(hn.hostname)  # "sub.example.com"
+    ///
+    ///     >>> Hostname("192.168.1.1")
+    ///     Traceback (most recent call last):
+    ///         ...
+    ///     ValueError: invalid hostname
     #[new]
     pub fn new(hn: &str) -> PyResult<Self> {
         let h = faup_rs::Host::parse(hn).map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -55,6 +96,7 @@ impl Hostname {
     }
 }
 
+/// Represents a host, which can be either a [`Hostname`] or an [`IpAddr`].
 #[pyclass]
 pub enum Host {
     /// A hostname (domain name).
@@ -74,6 +116,30 @@ impl From<faup_rs::Host<'_>> for Host {
 
 #[pymethods]
 impl Host {
+    /// Creates a new [`Host`] by parsing a host string.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - `str` - The host string to parse.
+    ///
+    /// # Returns
+    ///
+    /// * [`Host`] - The parsed host.
+    ///
+    /// # Raises
+    ///
+    /// * [`ValueError`] - If the input is not a valid host.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> host = Host("sub.example.com")
+    ///     >>> print(host.is_hostname())  # True
+    ///
+    ///     >>> Host("invalid host")
+    ///     Traceback (most recent call last):
+    ///         ...
+    ///     ValueError: ...
     #[new]
     pub fn new(s: &str) -> PyResult<Self> {
         faup_rs::Host::parse(s)
@@ -81,6 +147,27 @@ impl Host {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
+    /// Attempts to convert the host into a [`Hostname`].
+    ///
+    /// # Returns
+    ///
+    /// * [`Hostname`] - The hostname.
+    ///
+    /// # Raises
+    ///
+    /// * [`ValueError`] - If the host is not a hostname.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> host = Host("sub.example.com")
+    ///     >>> hn = host.try_into_hostname()
+    ///     >>> print(hn.hostname)  # "sub.example.com"
+    ///
+    ///     >>> Host("192.168.1.1").try_into_hostname()
+    ///     Traceback (most recent call last):
+    ///         ...
+    ///     ValueError: host object is not a hostname
     pub fn try_into_hostname(&self) -> PyResult<Hostname> {
         match self {
             Host::Hostname(h) => Ok(h.clone()),
@@ -88,6 +175,26 @@ impl Host {
         }
     }
 
+    /// Attempts to convert the host into an IP address string.
+    ///
+    /// # Returns
+    ///
+    /// * `str` - The IP address as a string.
+    ///
+    /// # Raises
+    ///
+    /// * [`ValueError`] - If the host is not an IP address.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> host = Host("192.168.1.1")
+    ///     >>> print(host.try_into_ip())  # "192.168.1.1"
+    ///
+    ///     >>> Host("sub.example.com").try_into_ip()
+    ///     Traceback (most recent call last):
+    ///         ...
+    ///     ValueError: host object is not an ip address
     pub fn try_into_ip(&self) -> PyResult<String> {
         match self {
             Host::Hostname(_) => Err(PyValueError::new_err("host object is not an ip address")),
@@ -95,21 +202,49 @@ impl Host {
         }
     }
 
+    /// Returns `True` if the host is a hostname.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> print(Host("sub.example.com").is_hostname())  # True
+    ///     >>> print(Host("192.168.1.1").is_hostname())       # False
     #[inline(always)]
     pub fn is_hostname(&self) -> bool {
         matches!(self, Host::Hostname(_))
     }
 
+    /// Returns `True` if the host is an IPv4 address.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> print(Host("192.168.1.1").is_ipv4())  # True
+    ///     >>> print(Host("::1").is_ipv4())          # False
     #[inline(always)]
     pub fn is_ipv4(&self) -> bool {
         matches!(self, Host::Ip(IpAddr::V4(_)))
     }
 
+    /// Returns `True` if the host is an IPv6 address.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> print(Host("::1").is_ipv6())  # True
+    ///     >>> print(Host("192.168.1.1").is_ipv6())  # False
     #[inline(always)]
     pub fn is_ipv6(&self) -> bool {
         matches!(self, Host::Ip(IpAddr::V6(_)))
     }
 
+    /// Returns `True` if the host is an IP address (either IPv4 or IPv6).
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> print(Host("192.168.1.1").is_ip_addr())  # True
+    ///     >>> print(Host("sub.example.com").is_ip_addr())  # False
     #[inline(always)]
     pub fn is_ip_addr(&self) -> bool {
         self.is_ipv4() | self.is_ipv6()
