@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from pyfaup import Url
+from pyfaup import Url, Host, Hostname
 
 
 class TestPyFaupRR(unittest.TestCase):
@@ -25,3 +25,61 @@ class TestPyFaupRR(unittest.TestCase):
         self.assertEqual(parsed_url.path, '/path')
         self.assertEqual(parsed_url.query, 'query=value')
         self.assertEqual(parsed_url.fragment, 'fragment')
+
+    def test_hostname(self) -> None:
+        hn = Hostname("sub.example.com")
+        self.assertEqual(hn.subdomain, "sub")
+        self.assertEqual(hn.domain, "example.com")
+        self.assertEqual(hn.suffix, "com")
+        self.assertEqual(str(hn), "sub.example.com")
+
+        with self.assertRaises(ValueError):
+            Hostname("192.168.1.1")
+
+    def test_host(self) -> None:
+        # Test hostname
+        host = Host("sub.example.com")
+        self.assertTrue(host.is_hostname())
+        self.assertFalse(host.is_ip_addr())
+        self.assertFalse(host.is_ipv4())
+        self.assertFalse(host.is_ipv6())
+        self.assertEqual(str(host), "sub.example.com")
+
+        # Test IPv4
+        host = Host("192.168.1.1")
+        self.assertFalse(host.is_hostname())
+        self.assertTrue(host.is_ip_addr())
+        self.assertTrue(host.is_ipv4())
+        self.assertFalse(host.is_ipv6())
+        self.assertEqual(str(host), "192.168.1.1")
+        self.assertEqual(host.try_into_ip(), "192.168.1.1")
+        with self.assertRaises(ValueError):
+            host.try_into_hostname()
+
+        # Test IPv6
+        host = Host("::1")
+        self.assertFalse(host.is_hostname())
+        self.assertTrue(host.is_ip_addr())
+        self.assertFalse(host.is_ipv4())
+        self.assertTrue(host.is_ipv6())
+        self.assertEqual(str(host), "::1")
+        self.assertEqual(host.try_into_ip(), "::1")
+        with self.assertRaises(ValueError):
+            host.try_into_hostname()
+
+        # Test hostname conversion
+        host = Host("sub.example.com")
+        hn = host.try_into_hostname()
+        self.assertEqual(str(hn), "sub.example.com")
+        self.assertEqual(hn.subdomain, "sub")
+        self.assertEqual(hn.domain, "example.com")
+        self.assertEqual(hn.suffix, "com")
+        with self.assertRaises(ValueError):
+            host.try_into_ip()
+
+        # Test invalid host
+        with self.assertRaises(ValueError):
+            Host("invalid host")
+
+if __name__ == "__main__":
+    unittest.main()

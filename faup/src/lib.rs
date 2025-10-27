@@ -133,8 +133,18 @@ pub enum Error {
     InvalidIPv4,
     #[error("invalid ipv6 address")]
     InvalidIPv6,
+    #[error("invalid host")]
+    InvalidHost,
+    #[error("{0}")]
+    Other(String),
     #[error("parser error: {0}")]
     Parse(#[from] Box<pest::error::Error<Rule>>),
+}
+
+impl Error {
+    fn other<S: AsRef<str>>(s: S) -> Self {
+        Error::Other(s.as_ref().to_string())
+    }
 }
 
 #[derive(Parser)]
@@ -395,12 +405,94 @@ impl fmt::Display for Host<'_> {
     }
 }
 
-impl<'url> Host<'url> {
+impl<'host> Host<'host> {
     fn into_owned<'owned>(self) -> Host<'owned> {
         match self {
             Host::Hostname(h) => Host::Hostname(h.into_owned()),
             Host::Ip(ip) => Host::Ip(ip),
         }
+    }
+
+    #[inline(always)]
+    fn from_pair(host_pair: Pair<'host, Rule>) -> Result<Self, Error> {
+        match host_pair.as_rule() {
+            Rule::hostname => {
+                if let Ok(ipv4) =
+                    UrlParser::parse(Rule::ipv4, host_pair.as_str()).map(|p| p.as_str())
+                {
+                    Ok(Ipv4Addr::from_str(ipv4)
+                        .map(IpAddr::from)
+                        .map(Host::Ip)
+                        .map_err(|_| Error::InvalidIPv4)?)
+                } else {
+                    Ok(Host::Hostname(Hostname::from_str(host_pair.as_str())))
+                }
+            }
+
+            Rule::ipv6 => Ok(Ipv6Addr::from_str(
+                host_pair.as_str().trim_matches(|c| c == '[' || c == ']'),
+            )
+            .map(IpAddr::from)
+            .map(Host::Ip)
+            .map_err(|_| Error::InvalidIPv6)?),
+            _ => Err(Error::other(format!(
+                "unexpected parsing rule: {:?}",
+                host_pair.as_rule()
+            ))),
+        }
+    }
+
+    /// Parses a string into a `Host` enum.
+    ///
+    /// This function expects the input string to be a URL host, which can be either
+    /// an IPv4 address, an IPv6 address, or a hostname.
+    ///
+    /// # Arguments
+    ///
+    /// * `host` - A string slice that holds the host to parse (e.g., `"example.com"`, `"127.0.0.1"`, `"::1"`).
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Host, Error>` - A [`Host`] enum if parsing is successful, or an [`Error`] if parsing fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Host;
+    ///
+    /// // Parse an IPv4 address
+    /// let host = Host::parse("127.0.0.1").unwrap();
+    /// assert!(matches!(host, Host::Ip(std::net::IpAddr::V4(_))));
+    ///
+    /// // Parse an IPv6 address
+    /// let host = Host::parse("::1").unwrap();
+    /// assert!(matches!(host, Host::Ip(std::net::IpAddr::V6(_))));
+    ///
+    /// // Parse a hostname
+    /// let host = Host::parse("example.com").unwrap();
+    /// assert!(matches!(host, Host::Hostname(_)));
+    ///
+    /// // Parse a hostname with a subdomain
+    /// let host = Host::parse("sub.example.com").unwrap();
+    /// assert!(matches!(host, Host::Hostname(_)));
+    ///
+    /// // Parse a hostname with a custom TLD
+    /// let host = Host::parse("example.b32.i2p").unwrap();
+    /// assert!(matches!(host, Host::Hostname(_)));
+    ///
+    /// // Attempt to parse an invalid host
+    /// let result = Host::parse("invalid..host");
+    /// assert!(matches!(result, Err(faup_rs::Error::InvalidHost)));
+    /// ```
+    #[inline]
+    pub fn parse(host: &'host str) -> Result<Self, Error> {
+        Self::from_pair(
+            UrlParser::parse(Rule::checked_host, host)
+                .map_err(|_| Error::InvalidHost)?
+                .next()
+                // this should not panic as parser guarantee some pair exist
+                .expect("expecting host pair"),
+        )
     }
 
     /// Returns the hostname component if this is a `Host::Hostname` variant.
@@ -595,34 +687,7 @@ impl<'url> Url<'url> {
                 Rule::host => {
                     // cannot panic guarantee by parser
                     let host_pair = p.into_inner().next().unwrap();
-                    match host_pair.as_rule() {
-                        Rule::hostname => {
-                            if let Ok(ipv4) =
-                                UrlParser::parse(Rule::ipv4, host_pair.as_str()).map(|p| p.as_str())
-                            {
-                                host = Some(
-                                    Ipv4Addr::from_str(ipv4)
-                                        .map(IpAddr::from)
-                                        .map(Host::Ip)
-                                        .map_err(|_| Error::InvalidIPv4)?,
-                                );
-                            } else {
-                                host = Some(Host::Hostname(Hostname::from_str(host_pair.as_str())))
-                            }
-                        }
-
-                        Rule::ipv6 => {
-                            host = Some(
-                                Ipv6Addr::from_str(
-                                    host_pair.as_str().trim_matches(|c| c == '[' || c == ']'),
-                                )
-                                .map(IpAddr::from)
-                                .map(Host::Ip)
-                                .map_err(|_| Error::InvalidIPv6)?,
-                            );
-                        }
-                        _ => {}
-                    }
+                    host = Some(Host::from_pair(host_pair)?)
                 }
                 Rule::port => {
                     port = Some(u16::from_str(p.as_str()).map_err(|_| Error::InvalidPort)?)
@@ -1254,5 +1319,39 @@ mod tests {
         // Path traversal
         let url = Url::parse("https://example.com/../../..some/directory/traversal/../").unwrap();
         assert_eq!(url.path(), Some("/../../..some/directory/traversal/../"));
+    }
+
+    #[test]
+    fn test_host_from_str() {
+        // Valid IPv4
+        let host = Host::parse("127.0.0.1").unwrap();
+        assert!(matches!(host, Host::Ip(std::net::IpAddr::V4(_))));
+
+        // Valid IPv6
+        let host = Host::parse("::1").unwrap();
+        assert!(matches!(host, Host::Ip(std::net::IpAddr::V6(_))));
+
+        let host = Host::parse("[::1]");
+        assert!(matches!(host, Err(Error::InvalidHost)));
+
+        // Invalid IPv6
+        let result = Host::parse("::::");
+        assert!(matches!(result, Err(Error::InvalidIPv6)));
+
+        // Valid hostname
+        let host = Host::parse("example.com").unwrap();
+        assert!(matches!(host, Host::Hostname(_)));
+
+        // Hostname with subdomain
+        let host = Host::parse("sub.example.com").unwrap();
+        assert!(matches!(host, Host::Hostname(_)));
+
+        // Hostname with custom TLD
+        let host = Host::parse("example.b32.i2p").unwrap();
+        assert!(matches!(host, Host::Hostname(_)));
+
+        // Invalid hostname (placeholder logic)
+        let result = Host::parse("example..com");
+        assert!(matches!(result, Err(Error::InvalidHost)));
     }
 }
