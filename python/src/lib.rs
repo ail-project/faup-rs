@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 
 struct Error(faup_rs::Error);
@@ -11,6 +13,113 @@ impl From<faup_rs::Error> for Error {
 impl From<Error> for PyErr {
     fn from(value: Error) -> Self {
         PyValueError::new_err(value.0.to_string())
+    }
+}
+
+#[pyclass]
+#[derive(Clone)]
+pub struct Hostname {
+    hostname: String,
+    #[pyo3(get)]
+    subdomain: Option<String>,
+    #[pyo3(get)]
+    domain: Option<String>,
+    #[pyo3(get)]
+    suffix: Option<String>,
+}
+
+impl From<faup_rs::Hostname<'_>> for Hostname {
+    fn from(value: faup_rs::Hostname<'_>) -> Self {
+        Self {
+            hostname: value.full_name().to_string(),
+            subdomain: value.subdomain().map(|s| s.into()),
+            domain: value.domain().map(|s| s.into()),
+            suffix: value.suffix().map(|s| s.into()),
+        }
+    }
+}
+
+#[pymethods]
+impl Hostname {
+    #[new]
+    pub fn new(hn: &str) -> PyResult<Self> {
+        let h = faup_rs::Host::parse(hn).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        match h {
+            faup_rs::Host::Hostname(h) => Ok(h.into()),
+            faup_rs::Host::Ip(_) => Err(PyValueError::new_err("invalid hostname")),
+        }
+    }
+
+    pub fn __str__(&self) -> &str {
+        self.hostname.as_str()
+    }
+}
+
+#[pyclass]
+pub enum Host {
+    /// A hostname (domain name).
+    Hostname(Hostname),
+    /// An IP address (either IPv4 or IPv6).
+    Ip(IpAddr),
+}
+
+impl From<faup_rs::Host<'_>> for Host {
+    fn from(value: faup_rs::Host) -> Self {
+        match value {
+            faup_rs::Host::Hostname(h) => Host::Hostname(h.into()),
+            faup_rs::Host::Ip(ip) => Host::Ip(ip),
+        }
+    }
+}
+
+#[pymethods]
+impl Host {
+    #[new]
+    pub fn new(s: &str) -> PyResult<Self> {
+        faup_rs::Host::parse(s)
+            .map(Host::from)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    pub fn try_into_hostname(&self) -> PyResult<Hostname> {
+        match self {
+            Host::Hostname(h) => Ok(h.clone()),
+            Host::Ip(_) => Err(PyValueError::new_err("host object is not a hostname")),
+        }
+    }
+
+    pub fn try_into_ip(&self) -> PyResult<String> {
+        match self {
+            Host::Hostname(_) => Err(PyValueError::new_err("host object is not an ip address")),
+            Host::Ip(ip) => Ok(ip.to_string()),
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_hostname(&self) -> bool {
+        matches!(self, Host::Hostname(_))
+    }
+
+    #[inline(always)]
+    pub fn is_ipv4(&self) -> bool {
+        matches!(self, Host::Ip(IpAddr::V4(_)))
+    }
+
+    #[inline(always)]
+    pub fn is_ipv6(&self) -> bool {
+        matches!(self, Host::Ip(IpAddr::V6(_)))
+    }
+
+    #[inline(always)]
+    pub fn is_ip_addr(&self) -> bool {
+        self.is_ipv4() | self.is_ipv6()
+    }
+
+    pub fn __str__(&self) -> String {
+        match self {
+            Self::Hostname(h) => h.hostname.clone(),
+            Self::Ip(ip) => ip.to_string(),
+        }
     }
 }
 
@@ -144,6 +253,9 @@ impl Url {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
+    pub fn __str__(&self) -> &str {
+        self.orig.as_ref()
+    }
 }
 
 /// A compatibility class that mimics the FAUP (Fast URL Parser) Python API.
@@ -284,12 +396,10 @@ impl FaupCompat {
             domain
                 .strip_suffix(tld)
                 .and_then(|dom| dom.strip_suffix('.'))
-        }
-        else {
+        } else {
             None
         }
     }
-
 }
 
 /// A Python module implemented in Rust for URL parsing.
@@ -312,6 +422,8 @@ impl FaupCompat {
 #[pymodule]
 fn pyfaup(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Url>()?;
+    m.add_class::<Host>()?;
+    m.add_class::<Hostname>()?;
     m.add_class::<FaupCompat>()?;
 
     Ok(())
