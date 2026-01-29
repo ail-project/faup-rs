@@ -123,6 +123,10 @@ use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
 use thiserror::Error;
 
+mod parser;
+
+use parser::*;
+
 static CUSTOM_TLDS: &[&str] = &["b32.i2p"];
 
 /// URL parsing errors that can occur during URL analysis.
