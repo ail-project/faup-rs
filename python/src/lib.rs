@@ -1,6 +1,11 @@
 use std::net::IpAddr;
 
-use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
+use pyo3::{
+    basic::CompareOp,
+    exceptions::{PyNotImplementedError, PyValueError},
+    prelude::*,
+    types::PyDict,
+};
 
 struct Error(faup_rs::Error);
 
@@ -16,6 +21,102 @@ impl From<Error> for PyErr {
     }
 }
 
+/// Represents a suffix (Top-Level Domain) from a hostname.
+///
+/// To get the string representation of the suffix, use `str(suffix)` or simply print it.
+/// The object implements the `__str__` method for easy string conversion.
+///
+/// # Example
+///
+///     >>> from pyfaup import Url
+///     >>> url = Url("https://example.com")
+///     >>> suffix = url.suffix
+///     >>> print(suffix)  # "com"  # Using print()
+///     >>> str_suffix = str(suffix)  # Using str()
+///     >>> print(suffix.is_known())  # True
+#[pyclass]
+#[derive(Clone)]
+pub struct Suffix {
+    value: String,
+    ty: faup_rs::SuffixType,
+}
+
+impl From<&faup_rs::Suffix<'_>> for Suffix {
+    fn from(value: &faup_rs::Suffix<'_>) -> Self {
+        Self {
+            value: value.as_str().into(),
+            ty: *value.ty(),
+        }
+    }
+}
+
+#[pymethods]
+impl Suffix {
+    /// Returns `True` if the suffix is a known Top-Level Domain.
+    /// A suffix is considered to be known if it is in Firefox PSL
+    /// or if it is in the list of custom suffix hardcoded in `faup-rs`
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Url
+    ///     >>> url = Url("https://example.com")
+    ///     >>> print(url.suffix.is_known())  # True
+    ///     >>> url2 = Url("https://example.local")
+    ///     >>> print(url2.suffix.is_known())  # False
+    pub fn is_known(&self) -> bool {
+        self.ty.is_known()
+    }
+
+    /// Returns the suffix as a string.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Url
+    ///     >>> url = Url("https://example.co.uk")
+    ///     >>> print(str(url.suffix))  # "co.uk"
+    pub fn __str__(&self) -> &str {
+        &self.value
+    }
+
+    /// Rich comparison method to enable comparison with strings.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Url
+    ///     >>> url = Url("https://example.com")
+    ///     >>> print(url.suffix == "com")  # True
+    ///     >>> print(url.suffix == "org")  # False
+    fn __richcmp__(&self, other: &Bound<'_, PyAny>, op: CompareOp) -> PyResult<bool> {
+        match op {
+            CompareOp::Eq => {
+                // Compare with string
+                if let Ok(other_str) = other.extract::<String>() {
+                    return Ok(self.value == other_str);
+                }
+                // Compare with another Suffix using PyRef
+                if let Ok(other_suffix) = other.extract::<PyRef<'_, Suffix>>() {
+                    return Ok(self.value == other_suffix.value);
+                }
+                Ok(false)
+            }
+            CompareOp::Ne => {
+                // Compare with string
+                if let Ok(other_str) = other.extract::<String>() {
+                    return Ok(self.value != other_str);
+                }
+                // Compare with another Suffix using PyRef
+                if let Ok(other_suffix) = other.extract::<PyRef<'_, Suffix>>() {
+                    return Ok(self.value != other_suffix.value);
+                }
+                Ok(true)
+            }
+            _ => Err(PyNotImplementedError::new_err(
+                "Comparison not supported for this operator",
+            )),
+        }
+    }
+}
+
 /// Represents a parsed hostname (domain name) with subdomain, domain, and suffix components.
 ///
 /// # Attributes
@@ -23,7 +124,7 @@ impl From<Error> for PyErr {
 /// * `hostname` - `str` - The full hostname.
 /// * `subdomain` - `Optional[str]` - The subdomain part, if present.
 /// * `domain` - `Optional[str]` - The domain part, if present.
-/// * `suffix` - `Optional[str]` - The suffix (TLD) part, if present.
+/// * `suffix` - `Optional[Suffix]` - The suffix (TLD) part, if present.
 ///
 /// # Example
 ///
@@ -42,7 +143,7 @@ pub struct Hostname {
     #[pyo3(get)]
     domain: Option<String>,
     #[pyo3(get)]
-    suffix: Option<String>,
+    suffix: Option<Suffix>,
 }
 
 impl From<faup_rs::Hostname<'_>> for Hostname {
@@ -51,7 +152,7 @@ impl From<faup_rs::Hostname<'_>> for Hostname {
             hostname: value.full_name().to_string(),
             subdomain: value.subdomain().map(|s| s.into()),
             domain: value.domain().map(|s| s.into()),
-            suffix: value.suffix().map(|s| s.into()),
+            suffix: value.suffix().map(|suf| suf.into()),
         }
     }
 }
@@ -271,7 +372,7 @@ impl Host {
 ///     host (str): The host part of the URL (hostname or IP address).
 ///     subdomain (Optional[str]): The subdomain part of the hostname, if present.
 ///     domain (Optional[str]): The domain part of the hostname, if recognized.
-///     suffix (Optional[str]): The suffix (TLD) of the hostname, if recognized.
+///     suffix (Optional[Suffix]): The suffix (TLD) of the hostname, if recognized.
 ///     port (Optional[int]): The port number, if specified.
 ///     path (Optional[str]): The path component of the URL, if present.
 ///     query (Optional[str]): The query string, if present.
@@ -301,7 +402,7 @@ pub struct Url {
     #[pyo3(get)]
     pub domain: Option<String>,
     #[pyo3(get)]
-    pub suffix: Option<String>,
+    pub suffix: Option<Suffix>,
     #[pyo3(get)]
     pub port: Option<u16>,
     #[pyo3(get)]
@@ -511,7 +612,7 @@ impl FaupCompat {
     }
 
     fn get_tld(&self) -> Option<&str> {
-        self.url.as_ref()?.suffix.as_deref()
+        self.url.as_ref()?.suffix.as_ref().map(|s| s.value.as_str())
     }
 
     fn get_query_string(&self) -> Option<&str> {
