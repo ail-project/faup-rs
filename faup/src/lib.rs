@@ -125,18 +125,52 @@ use thiserror::Error;
 
 static CUSTOM_TLDS: &[&str] = &["b32.i2p"];
 
+/// URL parsing errors that can occur during URL analysis.
+///
+/// This enum represents all possible errors that can occur when parsing URLs
+/// using the faup-rs library. Each variant corresponds to a specific type
+/// of parsing failure, from invalid port numbers to malformed IP addresses.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Invalid port number encountered during URL parsing.
+    ///
+    /// This error occurs when a port number cannot be parsed as a valid u16 value.
+    /// Port numbers must be between 0 and 65535.
     #[error("invalid port")]
     InvalidPort,
+
+    /// Invalid IPv4 address encountered during URL parsing.
+    ///
+    /// This error occurs when a string that should be an IPv4 address
+    /// cannot be parsed according to IPv4 address standards.
     #[error("invalid ipv4 address")]
     InvalidIPv4,
+
+    /// Invalid IPv6 address encountered during URL parsing.
+    ///
+    /// This error occurs when a string that should be an IPv6 address
+    /// cannot be parsed according to IPv6 address standards.
     #[error("invalid ipv6 address")]
     InvalidIPv6,
+
+    /// Invalid host encountered during URL parsing.
+    ///
+    /// This error occurs when a host string cannot be parsed as either
+    /// a valid hostname or a valid IP address (IPv4 or IPv6).
     #[error("invalid host")]
     InvalidHost,
+
+    /// Generic error for other parsing issues.
+    ///
+    /// This error is used for various parsing problems that don't fit
+    /// the more specific error categories.
     #[error("{0}")]
     Other(String),
+
+    /// Parsing error from the underlying pest parser.
+    ///
+    /// This error occurs when the URL string doesn't conform to
+    /// the expected grammar structure.
     #[error("parser error: {0}")]
     Parse(#[from] Box<pest::error::Error<Rule>>),
 }
