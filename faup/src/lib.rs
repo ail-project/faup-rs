@@ -120,7 +120,6 @@ use std::{
 };
 
 use pest::{Parser, iterators::Pair};
-use pest_derive::Parser;
 use thiserror::Error;
 
 mod parser;
