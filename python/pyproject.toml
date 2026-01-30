@@ -15,6 +15,7 @@ authors = [{ name = "Quentin JEROME", email = "quentin.jerome@circl.lu" }]
 maintainers = [{ name = "Quentin JEROME", email = "quentin.jerome@circl.lu" }]
 description = "Python bindings for faup-rs Rust library"
 readme = "README.md"
+license = "GPL-3.0"
 [project.urls]
 Repository = "https://github.com/ail-project/faup-rs"
 [tool.maturin]

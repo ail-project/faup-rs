@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! # faup-rs: Fast URL Parser for Rust
 //!
 //! [![Crates.io Version](https://img.shields.io/crates/v/faup-rs?style=for-the-badge&color=orange)](https://crates.io/crates/faup-rs)
@@ -53,7 +54,7 @@
 //! let url = Url::parse("https://sub.example.co.uk").unwrap();
 //! if let Host::Hostname(hostname) = url.host() {
 //!     assert_eq!(hostname.full_name(), "sub.example.co.uk");
-//!     assert_eq!(hostname.suffix(), Some("co.uk"));
+//!     assert_eq!(hostname.suffix_str(), Some("co.uk"));
 //!     assert_eq!(hostname.domain(), Some("example.co.uk"));
 //!     assert_eq!(hostname.subdomain(), Some("sub"));
 //! }
@@ -82,7 +83,7 @@
 //! use faup_rs::Url;
 //!
 //! let url = Url::parse("http://example.b32.i2p").unwrap();
-//! assert_eq!(url.suffix(), Some("b32.i2p"));
+//! assert_eq!(url.suffix_str(), Some("b32.i2p"));
 //!```
 //!
 //! ## Examples
@@ -184,18 +185,282 @@ impl Error {
     }
 }
 
-#[derive(Parser)]
-#[grammar = "grammar.pest"]
-pub(crate) struct UrlParser;
+/// Classification of a suffix (Top-Level Domain) based on its origin and validity.
+///
+/// This enum categorizes suffixes according to their source and compliance status.
+/// The classification helps determine whether a suffix is officially recognized
+/// by ICANN, privately managed, or unknown.
+///
+/// # Variants
+///
+/// - `Icann`: Suffixes that are officially recognized by ICANN and listed in the
+///   Mozilla Public Suffix List (PSL). These are standard top-level domains like
+///   `.com`, `.org`, `.net`, etc.
+///
+/// - `Private`: Suffixes that are privately managed but still listed in the Mozilla PSL.
+///   These include some specific domains used by organizations.
+///
+/// - `Unknown`: Suffixes that are not found in the Mozilla Public Suffix List.
+///   These are typically custom or non-standard suffixes used in private networks
+///   or testing environments (e.g., `.local`, `.test`, `.example`).
+///
+/// # Examples
+///
+/// ```
+/// use faup_rs::{Url, SuffixType};
+///
+/// // ICANN-recognized suffix
+/// let url = Url::parse("https://example.com").unwrap();
+/// assert!(matches!(url.suffix().unwrap().ty(), SuffixType::Icann));
+///
+/// // Private suffix (if in PSL)
+/// let url = Url::parse("https://example.transfer-webapp.af-south-1.on.aws").unwrap();
+/// assert!(matches!(url.suffix().unwrap().ty(), SuffixType::Private));
+///
+/// // Unknown suffix (in PSL)
+/// let url = Url::parse("https://example.custom").unwrap();
+/// assert!(matches!(url.suffix().unwrap().ty(), SuffixType::Unknown));
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub enum SuffixType {
+    /// ICANN-recognized top-level domain from the Mozilla Public Suffix List.
+    ///
+    /// These are standard, globally recognized domain suffixes like `.com`, `.org`, `.net`.
+    Icann,
 
-#[inline(always)]
-fn suffix(hostname: &str) -> Option<&str> {
-    for tld in CUSTOM_TLDS {
-        if hostname.ends_with(tld) {
-            return Some(tld);
+    /// Privately managed suffix from the Mozilla Public Suffix List.
+    ///
+    /// These include special-purpose domains like organization-specific
+    /// suffixes that are officially listed in PSL but not ICANN-managed.
+    Private,
+
+    /// Custom or non-standard suffix not found in the Mozilla Public Suffix List.
+    ///
+    /// These are typically used in private networks, testing environments, or custom setups.
+    /// Examples include `.local`, `.test`, `.example`, or any custom TLDs.
+    Unknown,
+}
+
+impl SuffixType {
+    #[inline]
+    fn from_psl_suffix(ps: psl::Suffix<'_>) -> Self {
+        ps.typ()
+            .map(|t| match t {
+                psl::Type::Icann => Self::Icann,
+                psl::Type::Private => Self::Private,
+            })
+            .unwrap_or(Self::Unknown)
+    }
+
+    /// Returns `true` if the suffix is known from official sources.
+    ///
+    /// A suffix is considered "known" if it is either:
+    /// - Listed in the Mozilla Public Suffix List (PSL) as ICANN-recognized (`Icann`)
+    /// - Listed in the Mozilla Public Suffix List as privately managed (`Private`)
+    ///
+    /// Returns `false` for custom or unknown suffixes that are not found in the PSL
+    /// and are not in the library's `CUSTOM_TLDS` list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::{SuffixType, Url};
+    ///
+    /// // Known suffixes (from PSL)
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// assert!(url.suffix().unwrap().ty().is_known()); // .com is in PSL
+    ///
+    /// // Unknown suffixes (not in PSL)
+    /// let url = Url::parse("https://example.custom").unwrap();
+    /// assert!(!url.suffix().unwrap().ty().is_known()); // .custom is not in PSL
+    /// ```
+    pub fn is_known(&self) -> bool {
+        match self {
+            SuffixType::Icann => true,
+            SuffixType::Private => true,
+            SuffixType::Unknown => false,
         }
     }
-    psl::suffix_str(hostname)
+}
+
+/// Internal representation of suffix data with type information.
+///
+/// `SuffixData` is an internal struct that stores a suffix (Top-Level Domain) string
+/// along with its classification type.
+///
+/// This struct is used internally by the [`Suffix`] enum to represent both PSL-based
+/// suffixes and custom suffixes with consistent data structure and methods.
+///
+/// # Type Parameters
+///
+/// - `'s`: Lifetime parameter indicating the lifetime of the borrowed string data
+#[derive(Debug)]
+pub struct SuffixData<'s> {
+    s: Cow<'s, str>,
+    ty: SuffixType,
+}
+
+impl<'s> SuffixData<'s> {
+    fn new(suf: &'s str, ty: SuffixType) -> Self {
+        SuffixData {
+            s: Cow::Borrowed(suf),
+            ty,
+        }
+    }
+
+    /// Returns the suffix as a string slice.
+    #[inline(always)]
+    pub fn as_str(&self) -> &str {
+        self.s.as_ref()
+    }
+
+    fn into_owned<'owned>(self) -> SuffixData<'owned> {
+        SuffixData {
+            s: Cow::Owned(self.s.into_owned()),
+            ty: self.ty,
+        }
+    }
+}
+
+/// Represents a suffix (Top-Level Domain) with its source classification.
+///
+/// The `Suffix` enum categorizes domain suffixes based on their origin:
+/// either from the Mozilla Public Suffix List (PSL) or as custom/unknown suffixes.
+///
+/// # Variants
+///
+/// - `Psl`: A suffix found in the Mozilla Public Suffix List. These are officially
+///   recognized domain suffixes that follow ICANN standards or are privately managed
+///   but listed in the PSL.
+///
+/// - `Custom`: A suffix defined in this library but not in PSL
+///
+/// # Type Parameters
+///
+/// - `'s`: Lifetime parameter for the borrowed string data
+///
+/// # Examples
+///
+/// ```
+/// use faup_rs::{Url, Suffix};
+///
+/// // PSL suffix (.com is in the Mozilla Public Suffix List)
+/// let url = Url::parse("https://example.com").unwrap();
+/// assert!(matches!(url.suffix(), Some(Suffix::Psl(_))));
+///
+/// // Custom suffix (.b32.i2p is not in PSL but hardcoded in this crate)
+/// let url = Url::parse("https://example.b32.i2p").unwrap();
+/// assert!(matches!(url.suffix(), Some(Suffix::Custom(_))));
+/// ```
+#[derive(Debug)]
+pub enum Suffix<'s> {
+    /// A custom suffix not found in the Mozilla Public Suffix List but defined in this crate.
+    Custom(SuffixData<'s>),
+
+    /// A suffix from the Mozilla Public Suffix List.
+    ///
+    /// These suffixes are officially recognized and follow established domain naming
+    /// standards. They can be either ICANN-managed or privately managed but listed
+    /// in the PSL.
+    Psl(SuffixData<'s>),
+}
+
+impl Suffix<'_> {
+    fn into_owned<'owned>(self) -> Suffix<'owned> {
+        match self {
+            Suffix::Custom(s) => Suffix::Custom(s.into_owned()),
+            Suffix::Psl(s) => Suffix::Psl(s.into_owned()),
+        }
+    }
+    
+    /// Returns the suffix as a string slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Url;
+    ///
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// if let Some(suffix) = url.suffix() {
+    ///     assert_eq!(suffix.as_str(), "com");
+    /// }
+    /// ```
+    #[inline(always)]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Suffix::Custom(s) => s.as_str(),
+            Suffix::Psl(s) => s.as_str(),
+        }
+    }
+
+
+    /// Returns the suffix type classification.
+    ///
+    /// This method provides a reference to the [`SuffixType`] enum that classifies
+    /// the suffix as either ICANN-recognized, privately managed, or unknown.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::{Url, SuffixType};
+    ///
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// if let Some(suffix) = url.suffix() {
+    ///     match suffix.ty() {
+    ///         SuffixType::Icann => println!("ICANN-recognized suffix"),
+    ///         SuffixType::Private => println!("Privately managed suffix"),
+    ///         SuffixType::Unknown => println!("Unknown suffix"),
+    ///     }
+    /// }
+    /// ```
+    pub fn ty(&self) -> &SuffixType {
+        match self {
+            Suffix::Custom(s) => &s.ty,
+            Suffix::Psl(s) => &s.ty,
+        }
+    }
+
+    /// Returns `true` if the suffix is known from official sources.
+    ///
+    /// A suffix is considered "known" if it is listed in the Mozilla Public
+    /// Suffix List or if it is in the list of hardcoded suffix of this crate.
+    /// Returns `false` for custom or unknown suffixes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Url;
+    ///
+    /// // Known suffix (.com is in PSL)
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// if let Some(suffix) = url.suffix() {
+    ///     assert!(suffix.is_known());
+    /// }
+    ///
+    /// // Unknown suffix (.custom is typically not in PSL)
+    /// let url = Url::parse("https://example.custom").unwrap();
+    /// if let Some(suffix) = url.suffix() {
+    ///     assert!(!suffix.is_known());
+    /// }
+    /// ```
+    pub fn is_known(&self) -> bool {
+        self.ty().is_known()
+    }
+}
+
+#[inline(always)]
+fn suffix<'h>(hostname: &'h str) -> Option<Suffix<'h>> {
+    for tld in CUSTOM_TLDS {
+        if hostname.ends_with(tld) {
+            return Some(Suffix::Custom(SuffixData::new(tld, SuffixType::Private)));
+        }
+    }
+    let suf_str = psl::suffix_str(hostname)?;
+    let suf = psl::suffix(hostname.as_bytes())?;
+    Some(Suffix::Psl(SuffixData::new(
+        suf_str,
+        SuffixType::from_psl_suffix(suf),
+    )))
 }
 
 /// Represents a parsed hostname with its components (subdomain, domain, and suffix).
@@ -214,7 +479,7 @@ fn suffix(hostname: &str) -> Option<&str> {
 /// let url = Url::parse("https://example.com").unwrap();
 /// if let Host::Hostname(hostname) = url.host() {
 ///     assert_eq!(hostname.full_name(), "example.com");
-///     assert_eq!(hostname.suffix(), Some("com"));
+///     assert_eq!(hostname.suffix_str(), Some("com"));
 ///     assert_eq!(hostname.domain(), Some("example.com"));
 ///     assert_eq!(hostname.subdomain(), None);
 /// }
@@ -223,7 +488,7 @@ fn suffix(hostname: &str) -> Option<&str> {
 /// let url = Url::parse("https://sub.example.co.uk").unwrap();
 /// if let Host::Hostname(hostname) = url.host() {
 ///     assert_eq!(hostname.full_name(), "sub.example.co.uk");
-///     assert_eq!(hostname.suffix(), Some("co.uk"));
+///     assert_eq!(hostname.suffix_str(), Some("co.uk"));
 ///     assert_eq!(hostname.domain(), Some("example.co.uk"));
 ///     assert_eq!(hostname.subdomain(), Some("sub"));
 /// }
@@ -232,7 +497,7 @@ fn suffix(hostname: &str) -> Option<&str> {
 /// let url = Url::parse("https://例子.测试").unwrap();
 /// if let Host::Hostname(hostname) = url.host() {
 ///     assert_eq!(hostname.full_name(), "例子.测试");
-///     assert_eq!(hostname.suffix(), Some("测试"));
+///     assert_eq!(hostname.suffix_str(), Some("测试"));
 ///     assert_eq!(hostname.domain(), Some("例子.测试"));
 ///     assert_eq!(hostname.subdomain(), None);
 /// }
@@ -240,7 +505,7 @@ fn suffix(hostname: &str) -> Option<&str> {
 /// // Parse a domain with custom TLD
 /// let url = Url::parse("http://example.b32.i2p").unwrap();
 /// if let Host::Hostname(hostname) = url.host() {
-///     assert_eq!(hostname.suffix(), Some("b32.i2p"));
+///     assert_eq!(hostname.suffix_str(), Some("b32.i2p"));
 /// }
 /// ```
 #[derive(Debug)]
@@ -248,7 +513,7 @@ pub struct Hostname<'url> {
     hostname: Cow<'url, str>,
     subdomain: Option<Cow<'url, str>>,
     domain: Option<Cow<'url, str>>,
-    suffix: Option<Cow<'url, str>>,
+    suffix: Option<Suffix<'url>>,
 }
 
 impl<'url> Hostname<'url> {
@@ -257,15 +522,15 @@ impl<'url> Hostname<'url> {
             hostname: Cow::Owned(self.hostname.into_owned()),
             subdomain: self.subdomain.map(|s| Cow::Owned(s.into_owned())),
             domain: self.domain.map(|d| Cow::Owned(d.into_owned())),
-            suffix: self.suffix.map(|s| Cow::Owned(s.into_owned())),
+            suffix: self.suffix.map(|s| s.into_owned()),
         }
     }
 
     fn from_str(hostname: &'url str) -> Self {
-        let suffix = suffix(hostname).map(Cow::Borrowed);
+        let suffix = suffix(hostname);
 
         let domain = if let Some(suffix) = suffix.as_ref() {
-            let i = hostname.rfind(suffix.as_ref()).unwrap();
+            let i = hostname.rfind(suffix.as_str()).unwrap();
             let dom_start = hostname[..i]
                 .trim_end_matches('.')
                 .rfind('.')
@@ -335,24 +600,51 @@ impl<'url> Hostname<'url> {
     /// // Standard TLD
     /// let url = Url::parse("https://example.com").unwrap();
     /// if let Host::Hostname(hostname) = url.host() {
-    ///     assert_eq!(hostname.suffix(), Some("com"));
+    ///     assert_eq!(hostname.suffix_str(), Some("com"));
     /// }
     ///
     /// // Multi-level TLD
     /// let url = Url::parse("https://example.co.uk").unwrap();
     /// if let Host::Hostname(hostname) = url.host() {
-    ///     assert_eq!(hostname.suffix(), Some("co.uk"));
+    ///     assert_eq!(hostname.suffix_str(), Some("co.uk"));
     /// }
     ///
     /// // Custom TLD
     /// let url = Url::parse("http://example.b32.i2p").unwrap();
     /// if let Host::Hostname(hostname) = url.host() {
-    ///     assert_eq!(hostname.suffix(), Some("b32.i2p"));
+    ///     assert_eq!(hostname.suffix_str(), Some("b32.i2p"));
     /// }
     /// ```
     #[inline(always)]
-    pub fn suffix(&self) -> Option<&str> {
-        self.suffix.as_ref().map(|p| p.as_ref())
+    pub fn suffix_str(&self) -> Option<&str> {
+        self.suffix.as_ref().map(|p| p.as_str())
+    }
+
+    /// Returns the suffix (TLD) part of the hostname as a [`Suffix`] enum, if recognized.
+    ///
+    /// The suffix represents the top-level domain (TLD) and can be either a standard
+    /// Public Suffix List (PSL) entry or a custom suffix.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<&Suffix>` - The suffix as a `Suffix` enum variant, or `None` if not recognized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::{Url, Host, Suffix};
+    ///
+    /// // Standard TLD
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// if let Host::Hostname(hostname) = url.host() {
+    ///     if let Some(Suffix::Psl(suf)) = hostname.suffix() {
+    ///         assert_eq!(suf.as_str(), "com");
+    ///     }
+    /// }
+    /// ```
+    #[inline(always)]
+    pub fn suffix(&self) -> Option<&Suffix<'_>> {
+        self.suffix.as_ref()
     }
 
     /// Returns the domain part of the hostname, if recognized.
@@ -490,7 +782,7 @@ impl<'host> Host<'host> {
     ///
     /// # Returns
     ///
-    /// * `Result<Host, Error>` - A [`Host`] enum if parsing is successful, or an [`Error`] if parsing fails.
+    /// * `Result<Host, Error>` - A [`Host`] enum if parsing is successful, or an [`enum@Error`] if parsing fails.
     ///
     /// # Examples
     ///
@@ -774,7 +1066,7 @@ impl<'url> Url<'url> {
     /// let url = Url::parse("https://example.com").unwrap();
     /// assert_eq!(url.scheme(), "https");
     /// assert_eq!(url.domain(), Some("example.com"));
-    /// assert_eq!(url.suffix(), Some("com"));
+    /// assert_eq!(url.suffix_str(), Some("com"));
     /// ```
     pub fn parse(s: &'url str) -> Result<Self, Error> {
         let mut pairs = UrlParser::parse(Rule::url, s).map_err(Box::new)?;
@@ -854,7 +1146,7 @@ impl<'url> Url<'url> {
     /// let hostname = url.host().as_hostname().unwrap();
     /// assert_eq!(hostname.full_name(), "sub2.sub1.example.com");
     /// assert_eq!(hostname.domain(), Some("example.com"));
-    /// assert_eq!(hostname.suffix(), Some("com"));
+    /// assert_eq!(hostname.suffix_str(), Some("com"));
     /// assert_eq!(hostname.subdomain(), Some("sub2.sub1"));
     /// ```
     #[inline(always)]
@@ -942,18 +1234,61 @@ impl<'url> Url<'url> {
     ///
     /// // With a standard TLD
     /// let url = Url::parse("https://example.com").unwrap();
-    /// assert_eq!(url.suffix(), Some("com"));
+    /// assert_eq!(url.suffix_str(), Some("com"));
     ///
     /// // With a custom TLD
     /// let url = Url::parse("http://example.b32.i2p").unwrap();
-    /// assert_eq!(url.suffix(), Some("b32.i2p"));
+    /// assert_eq!(url.suffix_str(), Some("b32.i2p"));
     ///
     /// // With an IP address
     /// let url = Url::parse("https://127.0.0.1").unwrap();
-    /// assert_eq!(url.suffix(), None);
+    /// assert_eq!(url.suffix_str(), None);
     /// ```
     #[inline(always)]
-    pub fn suffix(&self) -> Option<&str> {
+    pub fn suffix_str(&self) -> Option<&str> {
+        self.host.as_hostname().and_then(|h| h.suffix_str())
+    }
+
+    /// Returns the suffix (TLD) part of the URL's hostname as a `Suffix` enum, if recognized.
+    ///
+    /// The suffix represents the top-level domain (TLD) and can be either a standard
+    /// Public Suffix List (PSL) entry or a custom suffix. Returns `None` if the host
+    /// is an IP address or if no suffix is recognized.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<&Suffix>` - The suffix as a `Suffix` enum variant, or `None` if not recognized
+    ///   or if the host is an IP address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::{Url, Suffix};
+    ///
+    /// // With a standard TLD
+    /// let url = Url::parse("https://example.com").unwrap();
+    /// if let Some(Suffix::Psl(suf)) = url.suffix() {
+    ///     assert_eq!(suf.as_str(), "com");
+    /// }
+    ///
+    /// // With a multi-level TLD
+    /// let url = Url::parse("https://example.co.uk").unwrap();
+    /// if let Some(Suffix::Psl(suf)) = url.suffix() {
+    ///     assert_eq!(suf.as_str(), "co.uk");
+    /// }
+    ///
+    /// // With a custom TLD
+    /// let url = Url::parse("http://example.b32.i2p").unwrap();
+    /// if let Some(Suffix::Custom(suf)) = url.suffix() {
+    ///     assert_eq!(suf.as_str(), "b32.i2p");
+    /// }
+    ///
+    /// // With an IP address (returns None)
+    /// let url = Url::parse("https://127.0.0.1").unwrap();
+    /// assert!(url.suffix().is_none());
+    /// ```
+    #[inline(always)]
+    pub fn suffix(&self) -> Option<&Suffix<'_>> {
         self.host.as_hostname().and_then(|h| h.suffix())
     }
 
@@ -1114,7 +1449,7 @@ mod tests {
 
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "example.com");
-        assert_eq!(hn.suffix(), Some("com"));
+        assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
         assert_eq!(hn.subdomain(), None);
     }
@@ -1238,7 +1573,7 @@ mod tests {
         let url = Url::parse("https://example.com").unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "example.com");
-        assert_eq!(hn.suffix(), Some("com"));
+        assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
         assert_eq!(hn.subdomain(), None);
 
@@ -1246,7 +1581,7 @@ mod tests {
         let url = Url::parse("https://sub.example.com").unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "sub.example.com");
-        assert_eq!(hn.suffix(), Some("com"));
+        assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
         assert_eq!(hn.subdomain(), Some("sub"));
 
@@ -1254,7 +1589,7 @@ mod tests {
         let url = Url::parse("https://a.b.example.com").unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "a.b.example.com");
-        assert_eq!(hn.suffix(), Some("com"));
+        assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
         assert_eq!(hn.subdomain(), Some("a.b"));
 
@@ -1265,7 +1600,7 @@ mod tests {
         .unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "sub1.sub2.example.com");
-        assert_eq!(hn.suffix(), Some("com"));
+        assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
         assert_eq!(hn.subdomain(), Some("sub1.sub2"));
 
@@ -1273,15 +1608,16 @@ mod tests {
         let url = Url::parse("http://example.b32.i2p").unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "example.b32.i2p");
-        assert_eq!(hn.suffix(), Some("b32.i2p"));
+        assert_eq!(hn.suffix_str(), Some("b32.i2p"));
         assert_eq!(hn.domain(), Some("example.b32.i2p"));
         assert_eq!(hn.subdomain(), None);
+        assert!(hn.suffix.as_ref().unwrap().is_known());
 
         // UTF-8 hostname
         let url = Url::parse("https://例子.测试").unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "例子.测试");
-        assert_eq!(hn.suffix(), Some("测试"));
+        assert_eq!(hn.suffix_str(), Some("测试"));
         assert_eq!(hn.domain(), Some("例子.测试"));
         assert_eq!(hn.subdomain(), None);
 
@@ -1289,7 +1625,7 @@ mod tests {
         let url = Url::parse("https://子域.例子.测试").unwrap();
         let hn = url.host().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "子域.例子.测试");
-        assert_eq!(hn.suffix(), Some("测试"));
+        assert_eq!(hn.suffix_str(), Some("测试"));
         assert_eq!(hn.domain(), Some("例子.测试"));
         assert_eq!(hn.subdomain(), Some("子域"));
     }
@@ -1390,5 +1726,25 @@ mod tests {
         // Invalid hostname (placeholder logic)
         let result = Host::parse("example..com");
         assert!(matches!(result, Err(Error::InvalidHost)));
+    }
+
+    /// Test Hostname::suffix() method with various known and unknown suffixes
+    #[test]
+    fn test_hostname_suffix_detection() {
+        // Known PSL suffixes - should be recognized and known
+        let h = Hostname::from_str("example.com");
+        assert!(h.suffix().unwrap().is_known());
+
+        // Custom suffixes - should be known
+        let h = Hostname::from_str("example.b32.i2p");
+        assert!(h.suffix().unwrap().is_known());
+
+        // Private custom TLD - should not be known
+        let h = Hostname::from_str("test.custom-tld");
+        assert!(!h.suffix().unwrap().is_known());
+
+        // Edge case
+        let h = Hostname::from_str("SSH-2.0-OpenSSH_9.2p1");
+        assert!(!h.suffix().unwrap().is_known());
     }
 }
