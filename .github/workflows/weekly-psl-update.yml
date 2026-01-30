@@ -1,8 +1,6 @@
 name: Weekly PSL Update and Patch Release
 
 on:
-  pull_request:
-    branches: ["main"]
   schedule:
     # Run every Monday at 02:00 UTC
     - cron: "0 2 * * 1"
