@@ -58,9 +58,13 @@ jobs:
       - name: Create patch release
         if: steps.psl-changed.outputs.changed == 'true'
         run: |
-          cargo release patch --no-push --no-publish --execute --no-confirm
-          #git push
-          #git push --tags
+          # TODO: remove echo
+          echo git commit -am "chore: upgrade psl ${{ steps.current-psl.outputs.current_version }}->${{ steps.updated-psl.outputs.updated_version }}"
+          cargo release patch --no-push --no-publish --execute --no-confirm -p pyfaup-rs
+          # TODO: remove echo
+          echo git push
+          # TODO: remove echo
+          echo git push --tags
           echo "RELEASE_CREATED=true" >> $GITHUB_ENV
 
       - name: Summary
