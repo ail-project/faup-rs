@@ -22,8 +22,11 @@ jobs:
           fetch-depth: 0 # Full history needed for cargo-release
           ref: main # Always checkout main
 
+      # use cargo-binstall
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Install cargo-release
-        run: cargo install cargo-release
+        run: cargo binstall cargo-release
 
       - name: Configure Git
         run: |
