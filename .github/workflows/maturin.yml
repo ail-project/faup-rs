@@ -13,7 +13,7 @@ on:
       - main
       - master
     tags:
-      - '*'
+      - "*"
   pull_request:
   workflow_dispatch:
 
@@ -235,7 +235,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/pyfaup-rs-v') || github.event_name == 'workflow_dispatch' }}
     needs: [linux, musllinux, windows, macos, sdist]
     permissions:
       # Use to sign the release artifacts
@@ -250,7 +250,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: 'wheels-*/*'
+          subject-path: "wheels-*/*"
       - name: Install uv
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: astral-sh/setup-uv@v7
