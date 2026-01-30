@@ -22,12 +22,6 @@ jobs:
           fetch-depth: 0 # Full history needed for cargo-release
           ref: main # Always checkout main
 
-      # use cargo-binstall
-      - uses: cargo-bins/cargo-binstall@main
-
-      - name: Install cargo-release
-        run: cargo binstall --verbose cargo-release
-
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Actions"
@@ -36,8 +30,7 @@ jobs:
       - name: Check current PSL version
         id: current-psl
         run: |
-          #echo "current_version=$(cargo tree -p psl | grep psl | head -1 | awk '{print $2}')" >> $GITHUB_OUTPUT
-          echo "current_version=v2.1.149" >> $GITHUB_OUTPUT
+          echo "current_version=$(cargo tree -p psl | grep psl | head -1 | awk '{print $2}')" >> $GITHUB_OUTPUT
 
       - name: Update PSL dependency
         run: cargo update -p psl
@@ -58,16 +51,21 @@ jobs:
             echo "PSL version unchanged: ${{ steps.current-psl.outputs.current_version }}"
           fi
 
+      # use cargo-binstall
+      - uses: cargo-bins/cargo-binstall@main
+        if: steps.psl-changed.outputs.changed == 'true'
+
+      - name: Install cargo-release
+        if: steps.psl-changed.outputs.changed == 'true'
+        run: cargo binstall --verbose cargo-release
+
       - name: Create patch release
         if: steps.psl-changed.outputs.changed == 'true'
         run: |
-          # TODO: remove echo
-          echo git commit -am "chore: upgrade psl ${{ steps.current-psl.outputs.current_version }}->${{ steps.updated-psl.outputs.updated_version }}"
+          git commit -am "chore: upgrade psl ${{ steps.current-psl.outputs.current_version }}->${{ steps.updated-psl.outputs.updated_version }}"
           cargo release patch --no-push --no-publish --execute --no-confirm -p pyfaup-rs
-          # TODO: remove echo
-          echo git push
-          # TODO: remove echo
-          echo git push --tags
+          git push
+          git push --tags
           echo "RELEASE_CREATED=true" >> $GITHUB_ENV
 
       - name: Summary
