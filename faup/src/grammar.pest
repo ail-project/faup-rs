@@ -23,7 +23,9 @@ port = ${ ASCII_ALPHANUMERIC{,5} }
 path_segment = ${ (encoded_char | (!("?" | "/" | "#" | WHITE_SPACE) ~ ANY))* }
 path         = ${ ("/" ~ path_segment)+ }
 
-query_param = ${ (!("=") ~ ANY)+ ~ "=" ~ (encoded_char | (!("?" | "/" | "#") ~ ANY))* }
-query       = ${ "?" ~ (query_param ~ "&")* ~ query_param? }
+query_char    = ${ (!("#") ~ ANY) }
+query_param   = ${ (!("=") ~ ANY)+ ~ "=" ~ (encoded_char | query_char)* }
+opaque_string = ${ (encoded_char | query_char)* }
+query         = ${ "?" ~ ((query_param | opaque_string) ~ "&")* ~ (query_param | opaque_string)? }
 
 fragment = ${ "#" ~ (encoded_char | ANY)* }
