@@ -372,7 +372,7 @@ impl Suffix<'_> {
             Suffix::Psl(s) => Suffix::Psl(s.into_owned()),
         }
     }
-    
+
     /// Returns the suffix as a string slice.
     ///
     /// # Examples
@@ -392,7 +392,6 @@ impl Suffix<'_> {
             Suffix::Psl(s) => s.as_str(),
         }
     }
-
 
     /// Returns the suffix type classification.
     ///
@@ -1746,5 +1745,33 @@ mod tests {
         // Edge case
         let h = Hostname::from_str("SSH-2.0-OpenSSH_9.2p1");
         assert!(!h.suffix().unwrap().is_known());
+    }
+
+    #[test]
+    fn tests_query_bug() {
+        // tests from issue: https://github.com/ail-project/faup-rs/issues/12
+        let u = Url::parse("https://www.gstatic.com/mysidia/c081791544e5ee0d5e650a98f7336d84.js?tag=addon/mysidia_one_click_handler_one_afma").unwrap();
+        assert_eq!(
+            u.query(),
+            Some("tag=addon/mysidia_one_click_handler_one_afma")
+        );
+
+        let u = Url::parse("https://ib.adnxs.com/getuid?https%3A%2F%2Flive.primis.tech%2Flive%2FliveCS.php%3Fsource%3Dexternal%26advId%3D105%26advUuid%3D%24UID%26gdpr%3D1%26gdpr_consent%3DCQe140AQe140AAKA8AENCQFsAP_gAEPgACiQL8tR_G__bWlr-bb3aftkeYxP9_hr7sQxBgbJk24FzLvW7JwXx2E5NAzatqIKmRIAu3TBIQNlHJDURUCgKIgFryDMaEyU4TNKJ6BkiFMZI2tYCFxvm4tjWQCY4vr99lc1mB-t7dr82dzyy6hHn3a5_2S1UJCdIYetDfv8ZBKT-9IEd_x8v4v4_EbpE2-eS1n_pGvp4jd-YnM_dBmxt-Tyff7Pn__rl_e7X_vc_n3zv94XH77v_-__f_-7___2b_-__gvuACYaFRBGWRAgECgYQQIAFBWEAFAgCAABIGiAgBMGBDkDABdYTIAQAoABggBAACDAAEAAAkACEQAQAEAgBAgECgADAAgCAgAYGAAMAFiIBAACA6BimBBAIFgAkZlUGmBKAAkEBLZUIJQMCCuEIRZ4BBAiJgoAAAQACgAAAHgsBCSQErEggC4gmgAAIAAAogRIEUhZgCCoM0WgrAk4DI0wDB8wTJKdBkATBCRkGRCb8Jh4pCiBBDkBsUswB08QUAIAAAAA.IAAA.YAAAAAAAAAAA").inspect_err(|e| print!("{e}")).unwrap();
+        assert_eq!(
+            u.query(),
+            Some(
+                "https%3A%2F%2Flive.primis.tech%2Flive%2FliveCS.php%3Fsource%3Dexternal%26advId%3D105%26advUuid%3D%24UID%26gdpr%3D1%26gdpr_consent%3DCQe140AQe140AAKA8AENCQFsAP_gAEPgACiQL8tR_G__bWlr-bb3aftkeYxP9_hr7sQxBgbJk24FzLvW7JwXx2E5NAzatqIKmRIAu3TBIQNlHJDURUCgKIgFryDMaEyU4TNKJ6BkiFMZI2tYCFxvm4tjWQCY4vr99lc1mB-t7dr82dzyy6hHn3a5_2S1UJCdIYetDfv8ZBKT-9IEd_x8v4v4_EbpE2-eS1n_pGvp4jd-YnM_dBmxt-Tyff7Pn__rl_e7X_vc_n3zv94XH77v_-__f_-7___2b_-__gvuACYaFRBGWRAgECgYQQIAFBWEAFAgCAABIGiAgBMGBDkDABdYTIAQAoABggBAACDAAEAAAkACEQAQAEAgBAgECgADAAgCAgAYGAAMAFiIBAACA6BimBBAIFgAkZlUGmBKAAkEBLZUIJQMCCuEIRZ4BBAiJgoAAAQACgAAAHgsBCSQErEggC4gmgAAIAAAogRIEUhZgCCoM0WgrAk4DI0wDB8wTJKdBkATBCRkGRCb8Jh4pCiBBDkBsUswB08QUAIAAAAA.IAAA.YAAAAAAAAAAA"
+            )
+        );
+
+        let u = Url::parse(
+            "https://sync.a-mo.net/cjoin/1?cb=https%3A%2F%2Fprebid.a-mo.net%2Fcchain%2F4%2F24901%3Fgpp%3D%26gdpr_consent%3DCQe140AQe140AAKA8AENCQFsAP_gAEPgACiQL8tR_G__bWlr-bb3aftkeYxP9_hr7sQxBgbJk24FzLvW7JwXx2E5NAzatqIKmRIAu3TBIQNlHJDURUCgKIgFryDMaEyU4TNKJ6BkiFMZI2tYCFxvm4tjWQCY4vr99lc1mB-t7dr82dzyy6hHn3a5_2S1UJCdIYetDfv8ZBKT-9IEd_x8v4v4_EbpE2-eS1n_pGvp4jd-YnM_dBmxt-Tyff7Pn__rl_e7X_vc_n3zv94XH77v_-__f_-7___2b_-__gvuACYaFRBGWRAgECgYQQIAFBWEAFAgCAABIGiAgBMGBDkDABdYTIAQAoABggBAACDAAEAAAkACEQAQAEAgBAgECgADAAgCAgAYGAAMAFiIBAACA6BimBBAIFgAkZlUGmBKAAkEBLZUIJQMCCuEIRZ4BBAiJgoAAAQACgAAAHgsBCSQErEggC4gmgAAIAAAogRIEUhZgCCoM0WgrAk4DI0wDB8wTJKdBkATBCRkGRCb8Jh4pCiBBDkBsUswB08QUAIAAAAA.IAAA.YAAAAAAAAAAA%26gdpr%3D1%26gpp_sid%3D%26us_privacy%3D%26A%3D037c5ad0-ef80-48d1-bf62-ad8c8fad73ed%26bidder%3Damx_com%26cbx%3DaHR0cHM6Ly9saXZlLnByaW1pcy50ZWNoL2xpdmUvbGl2ZUNTLnBocD9zb3VyY2U9ZXh0ZXJuYWwmYWR2SWQ9MTU2L3NldHVpZD91aWQ9%26uid%3D037c5ad0-ef80-48d1-bf62-ad8c8fad73ed&uid=037c5ad0-ef80-48d1-bf62-ad8c8fad73ed&?us_privacy=1---&gdpr_consent=CQe140AQe140AAKA8AENCQFsAP_gAEPgACiQL8tR_G__bWlr-bb3aftkeYxP9_hr7sQxBgbJk24FzLvW7JwXx2E5NAzatqIKmRIAu3TBIQNlHJDURUCgKIgFryDMaEyU4TNKJ6BkiFMZI2tYCFxvm4tjWQCY4vr99lc1mB-t7dr82dzyy6hHn3a5_2S1UJCdIYetDfv8ZBKT-9IEd_x8v4v4_EbpE2-eS1n_pGvp4jd-YnM_dBmxt-Tyff7Pn__rl_e7X_vc_n3zv94XH77v_-__f_-7___2b_-__gvuACYaFRBGWRAgECgYQQIAFBWEAFAgCAABIGiAgBMGBDkDABdYTIAQAoABggBAACDAAEAAAkACEQAQAEAgBAgECgADAAgCAgAYGAAMAFiIBAACA6BimBBAIFgAkZlUGmBKAAkEBLZUIJQMCCuEIRZ4BBAiJgoAAAQACgAAAHgsBCSQErEggC4gmgAAIAAAogRIEUhZgCCoM0WgrAk4DI0wDB8wTJKdBkATBCRkGRCb8Jh4pCiBBDkBsUswB08QUAIAAAAA.IAAA.YAAAAAAAAAAA&gdpr=1",
+        ).unwrap();
+        assert_eq!(
+            u.query(),
+            Some(
+                "cb=https%3A%2F%2Fprebid.a-mo.net%2Fcchain%2F4%2F24901%3Fgpp%3D%26gdpr_consent%3DCQe140AQe140AAKA8AENCQFsAP_gAEPgACiQL8tR_G__bWlr-bb3aftkeYxP9_hr7sQxBgbJk24FzLvW7JwXx2E5NAzatqIKmRIAu3TBIQNlHJDURUCgKIgFryDMaEyU4TNKJ6BkiFMZI2tYCFxvm4tjWQCY4vr99lc1mB-t7dr82dzyy6hHn3a5_2S1UJCdIYetDfv8ZBKT-9IEd_x8v4v4_EbpE2-eS1n_pGvp4jd-YnM_dBmxt-Tyff7Pn__rl_e7X_vc_n3zv94XH77v_-__f_-7___2b_-__gvuACYaFRBGWRAgECgYQQIAFBWEAFAgCAABIGiAgBMGBDkDABdYTIAQAoABggBAACDAAEAAAkACEQAQAEAgBAgECgADAAgCAgAYGAAMAFiIBAACA6BimBBAIFgAkZlUGmBKAAkEBLZUIJQMCCuEIRZ4BBAiJgoAAAQACgAAAHgsBCSQErEggC4gmgAAIAAAogRIEUhZgCCoM0WgrAk4DI0wDB8wTJKdBkATBCRkGRCb8Jh4pCiBBDkBsUswB08QUAIAAAAA.IAAA.YAAAAAAAAAAA%26gdpr%3D1%26gpp_sid%3D%26us_privacy%3D%26A%3D037c5ad0-ef80-48d1-bf62-ad8c8fad73ed%26bidder%3Damx_com%26cbx%3DaHR0cHM6Ly9saXZlLnByaW1pcy50ZWNoL2xpdmUvbGl2ZUNTLnBocD9zb3VyY2U9ZXh0ZXJuYWwmYWR2SWQ9MTU2L3NldHVpZD91aWQ9%26uid%3D037c5ad0-ef80-48d1-bf62-ad8c8fad73ed&uid=037c5ad0-ef80-48d1-bf62-ad8c8fad73ed&?us_privacy=1---&gdpr_consent=CQe140AQe140AAKA8AENCQFsAP_gAEPgACiQL8tR_G__bWlr-bb3aftkeYxP9_hr7sQxBgbJk24FzLvW7JwXx2E5NAzatqIKmRIAu3TBIQNlHJDURUCgKIgFryDMaEyU4TNKJ6BkiFMZI2tYCFxvm4tjWQCY4vr99lc1mB-t7dr82dzyy6hHn3a5_2S1UJCdIYetDfv8ZBKT-9IEd_x8v4v4_EbpE2-eS1n_pGvp4jd-YnM_dBmxt-Tyff7Pn__rl_e7X_vc_n3zv94XH77v_-__f_-7___2b_-__gvuACYaFRBGWRAgECgYQQIAFBWEAFAgCAABIGiAgBMGBDkDABdYTIAQAoABggBAACDAAEAAAkACEQAQAEAgBAgECgADAAgCAgAYGAAMAFiIBAACA6BimBBAIFgAkZlUGmBKAAkEBLZUIJQMCCuEIRZ4BBAiJgoAAAQACgAAAHgsBCSQErEggC4gmgAAIAAAogRIEUhZgCCoM0WgrAk4DI0wDB8wTJKdBkATBCRkGRCb8Jh4pCiBBDkBsUswB08QUAIAAAAA.IAAA.YAAAAAAAAAAA&gdpr=1"
+            )
+        );
     }
 }
