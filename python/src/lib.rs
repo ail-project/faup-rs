@@ -396,7 +396,7 @@ pub struct Url {
     #[pyo3(get)]
     pub password: Option<String>,
     #[pyo3(get)]
-    pub host: String,
+    pub host: Option<String>,
     #[pyo3(get)]
     pub subdomain: Option<String>,
     #[pyo3(get)]
@@ -428,13 +428,14 @@ impl From<faup_rs::Url<'_>> for Url {
         };
 
         let host = match value.host() {
-            faup_rs::Host::Hostname(hostname) => {
+            Some(faup_rs::Host::Hostname(hostname)) => {
                 subdomain = hostname.subdomain().map(|s| s.into());
                 domain = hostname.domain().map(|d| d.into());
                 suffix = hostname.suffix().map(|s| s.into());
-                hostname.full_name().into()
+                Some(hostname.full_name().into())
             }
-            faup_rs::Host::Ip(ip) => ip.to_string(),
+            Some(faup_rs::Host::Ip(ip)) => Some(ip.to_string()),
+            None => None,
         };
 
         Self {
@@ -604,7 +605,7 @@ impl FaupCompat {
     }
 
     fn get_host(&self) -> Option<&str> {
-        self.url.as_ref().map(|u| u.host.as_str())
+        self.url.as_ref().map(|u| u.host.as_ref())?.map(|h| h.as_ref())
     }
 
     fn get_resource_path(&self) -> Option<&str> {

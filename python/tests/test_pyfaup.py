@@ -8,7 +8,7 @@ from pyfaup import Host, Hostname, Url
 
 
 class TestPyFaupRR(unittest.TestCase):
-    def test_url(self) -> None:
+    def test_http_url(self) -> None:
         parsed_url = Url(
             "https://user:pass@sub.example.com:8080/path?query=value#fragment"
         )
@@ -30,6 +30,13 @@ class TestPyFaupRR(unittest.TestCase):
         self.assertEqual(parsed_url.query, "query=value")
         self.assertEqual(parsed_url.fragment, "fragment")
 
+    def test_file_url(self) -> None:
+        u = Url("file:///tmp/test.txt")
+
+        self.assertEqual(u.scheme, "file")
+        self.assertEqual(u.host, None)
+        self.assertEqual(u.path, "/tmp/test.txt")
+
     def test_hostname(self) -> None:
         hn = Hostname("sub.example.com")
         self.assertEqual(hn.subdomain, "sub")
@@ -50,7 +57,7 @@ class TestPyFaupRR(unittest.TestCase):
         hn = Hostname("SSH-2.0-OpenSSH_9.2p1")
         if hn.suffix is not None:
             self.assertFalse(hn.suffix.is_known())
-            
+
         hn = Hostname("laptop.local")
         if hn.suffix is not None:
             self.assertFalse(hn.suffix.is_known())

@@ -40,7 +40,7 @@
 //!
 //! let url = Url::parse("https://user:pass@sub.example.com:8080/path?query=value#fragment").unwrap();
 //! assert_eq!(url.scheme(), "https");
-//! assert_eq!(url.host().to_string(), "sub.example.com");
+//! assert_eq!(url.host().unwrap().to_string(), "sub.example.com");
 //! assert_eq!(url.port(), Some(8080));
 //! assert_eq!(url.path(), Some("/path"));
 //! assert_eq!(url.query(), Some("query=value"));
@@ -52,7 +52,7 @@
 //! use faup_rs::{Url, Host};
 //!
 //! let url = Url::parse("https://sub.example.co.uk").unwrap();
-//! if let Host::Hostname(hostname) = url.host() {
+//! if let Host::Hostname(hostname) = url.host().unwrap() {
 //!     assert_eq!(hostname.full_name(), "sub.example.co.uk");
 //!     assert_eq!(hostname.suffix_str(), Some("co.uk"));
 //!     assert_eq!(hostname.domain(), Some("example.co.uk"));
@@ -65,7 +65,7 @@
 //! use faup_rs::Url;
 //!
 //! let url = Url::parse("http://[::1]").unwrap();
-//! assert!(matches!(url.host(), faup_rs::Host::Ip(ip) if ip.is_loopback()));
+//! assert!(matches!(url.host().unwrap(), faup_rs::Host::Ip(ip) if ip.is_loopback()));
 //!```
 //!
 //! ### User Info (UTF-8 Support)
@@ -476,7 +476,7 @@ fn suffix<'h>(hostname: &'h str) -> Option<Suffix<'h>> {
 ///
 /// // Parse a simple domain
 /// let url = Url::parse("https://example.com").unwrap();
-/// if let Host::Hostname(hostname) = url.host() {
+/// if let Host::Hostname(hostname) = url.host().unwrap() {
 ///     assert_eq!(hostname.full_name(), "example.com");
 ///     assert_eq!(hostname.suffix_str(), Some("com"));
 ///     assert_eq!(hostname.domain(), Some("example.com"));
@@ -485,7 +485,7 @@ fn suffix<'h>(hostname: &'h str) -> Option<Suffix<'h>> {
 ///
 /// // Parse a domain with subdomains
 /// let url = Url::parse("https://sub.example.co.uk").unwrap();
-/// if let Host::Hostname(hostname) = url.host() {
+/// if let Host::Hostname(hostname) = url.host().unwrap() {
 ///     assert_eq!(hostname.full_name(), "sub.example.co.uk");
 ///     assert_eq!(hostname.suffix_str(), Some("co.uk"));
 ///     assert_eq!(hostname.domain(), Some("example.co.uk"));
@@ -494,7 +494,7 @@ fn suffix<'h>(hostname: &'h str) -> Option<Suffix<'h>> {
 ///
 /// // Parse a domain with UTF-8 characters
 /// let url = Url::parse("https://例子.测试").unwrap();
-/// if let Host::Hostname(hostname) = url.host() {
+/// if let Host::Hostname(hostname) = url.host().unwrap() {
 ///     assert_eq!(hostname.full_name(), "例子.测试");
 ///     assert_eq!(hostname.suffix_str(), Some("测试"));
 ///     assert_eq!(hostname.domain(), Some("例子.测试"));
@@ -503,7 +503,7 @@ fn suffix<'h>(hostname: &'h str) -> Option<Suffix<'h>> {
 ///
 /// // Parse a domain with custom TLD
 /// let url = Url::parse("http://example.b32.i2p").unwrap();
-/// if let Host::Hostname(hostname) = url.host() {
+/// if let Host::Hostname(hostname) = url.host().unwrap() {
 ///     assert_eq!(hostname.suffix_str(), Some("b32.i2p"));
 /// }
 /// ```
@@ -573,7 +573,7 @@ impl<'url> Hostname<'url> {
     /// use faup_rs::{Url, Host};
     ///
     /// let url = Url::parse("https://sub.example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.full_name(), "sub.example.com");
     /// }
     /// ```
@@ -598,19 +598,19 @@ impl<'url> Hostname<'url> {
     ///
     /// // Standard TLD
     /// let url = Url::parse("https://example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.suffix_str(), Some("com"));
     /// }
     ///
     /// // Multi-level TLD
     /// let url = Url::parse("https://example.co.uk").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.suffix_str(), Some("co.uk"));
     /// }
     ///
     /// // Custom TLD
     /// let url = Url::parse("http://example.b32.i2p").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.suffix_str(), Some("b32.i2p"));
     /// }
     /// ```
@@ -635,7 +635,7 @@ impl<'url> Hostname<'url> {
     ///
     /// // Standard TLD
     /// let url = Url::parse("https://example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     if let Some(Suffix::Psl(suf)) = hostname.suffix() {
     ///         assert_eq!(suf.as_str(), "com");
     ///     }
@@ -662,13 +662,13 @@ impl<'url> Hostname<'url> {
     ///
     /// // Simple domain
     /// let url = Url::parse("https://example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.domain(), Some("example.com"));
     /// }
     ///
     /// // Domain with multi-level TLD
     /// let url = Url::parse("https://example.co.uk").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.domain(), Some("example.co.uk"));
     /// }
     /// ```
@@ -693,19 +693,19 @@ impl<'url> Hostname<'url> {
     ///
     /// // Single-level subdomain
     /// let url = Url::parse("https://sub.example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.subdomain(), Some("sub"));
     /// }
     ///
     /// // Multi-level subdomain
     /// let url = Url::parse("https://a.b.example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.subdomain(), Some("a.b"));
     /// }
     ///
     /// // No subdomain
     /// let url = Url::parse("https://example.com").unwrap();
-    /// if let Host::Hostname(hostname) = url.host() {
+    /// if let Host::Hostname(hostname) = url.host().unwrap() {
     ///     assert_eq!(hostname.subdomain(), None);
     /// }
     /// ```
@@ -966,7 +966,7 @@ impl UserInfo<'_> {
 /// // Parse a simple URL
 /// let url = Url::parse("https://example.com").unwrap();
 /// assert_eq!(url.scheme(), "https");
-/// assert_eq!(url.host().as_hostname().unwrap().full_name(), "example.com");
+/// assert_eq!(url.host().unwrap().as_hostname().unwrap().full_name(), "example.com");
 ///
 /// // Parse a URL with all components
 /// let url = Url::parse("https://user:pass@sub.example.com:8080/path?query=value#fragment").unwrap();
@@ -982,7 +982,7 @@ pub struct Url<'url> {
     orig: Cow<'url, str>,
     scheme: Cow<'url, str>,
     userinfo: Option<UserInfo<'url>>,
-    host: Host<'url>,
+    host: Option<Host<'url>>,
     port: Option<u16>,
     path: Option<Cow<'url, str>>,
     query: Option<Cow<'url, str>>,
@@ -1039,7 +1039,7 @@ impl<'url> Url<'url> {
             orig,
             scheme: scheme.unwrap(),
             userinfo,
-            host: host.unwrap(),
+            host,
             port,
             path,
             query,
@@ -1130,7 +1130,7 @@ impl<'url> Url<'url> {
         self.userinfo.as_ref()
     }
 
-    /// Returns the host component of the URL.
+    /// Returns the host component of the URL, if present.
     ///
     /// # Returns
     ///
@@ -1142,15 +1142,15 @@ impl<'url> Url<'url> {
     /// use faup_rs::Url;
     ///
     /// let url = Url::parse("https://sub2.sub1.example.com").unwrap();
-    /// let hostname = url.host().as_hostname().unwrap();
+    /// let hostname = url.host().unwrap().as_hostname().unwrap();
     /// assert_eq!(hostname.full_name(), "sub2.sub1.example.com");
     /// assert_eq!(hostname.domain(), Some("example.com"));
     /// assert_eq!(hostname.suffix_str(), Some("com"));
     /// assert_eq!(hostname.subdomain(), Some("sub2.sub1"));
     /// ```
     #[inline(always)]
-    pub fn host(&self) -> &Host<'_> {
-        &self.host
+    pub fn host(&self) -> Option<&Host<'_>> {
+        self.host.as_ref()
     }
 
     /// Returns the domain part of the hostname, if present.
@@ -1179,7 +1179,7 @@ impl<'url> Url<'url> {
     /// ```
     #[inline(always)]
     pub fn domain(&self) -> Option<&str> {
-        self.host.as_hostname().and_then(|h| h.domain())
+        self.host.as_ref()?.as_hostname().and_then(|h| h.domain())
     }
 
     /// Returns the subdomain part of the hostname, if present.
@@ -1212,7 +1212,10 @@ impl<'url> Url<'url> {
     /// ```
     #[inline(always)]
     pub fn subdomain(&self) -> Option<&str> {
-        self.host.as_hostname().and_then(|h| h.subdomain())
+        self.host
+            .as_ref()?
+            .as_hostname()
+            .and_then(|h| h.subdomain())
     }
 
     /// Returns the suffix (top-level domain) of the hostname, if present.
@@ -1245,7 +1248,10 @@ impl<'url> Url<'url> {
     /// ```
     #[inline(always)]
     pub fn suffix_str(&self) -> Option<&str> {
-        self.host.as_hostname().and_then(|h| h.suffix_str())
+        self.host
+            .as_ref()?
+            .as_hostname()
+            .and_then(|h| h.suffix_str())
     }
 
     /// Returns the suffix (TLD) part of the URL's hostname as a `Suffix` enum, if recognized.
@@ -1288,7 +1294,7 @@ impl<'url> Url<'url> {
     /// ```
     #[inline(always)]
     pub fn suffix(&self) -> Option<&Suffix<'_>> {
-        self.host.as_hostname().and_then(|h| h.suffix())
+        self.host.as_ref()?.as_hostname().and_then(|h| h.suffix())
     }
 
     /// Returns the port number of the URL, if present.
@@ -1392,7 +1398,7 @@ impl<'url> Url<'url> {
             orig: Cow::Owned(self.orig.into_owned()),
             scheme: Cow::Owned(self.scheme.into_owned()),
             userinfo: self.userinfo.map(|u| u.into_owned()),
-            host: self.host.into_owned(),
+            host: self.host.map(|h| h.into_owned()),
             port: self.port,
             path: self.path.map(|p| Cow::Owned(p.into_owned())),
             query: self.query.map(|q| Cow::Owned(q.into_owned())),
@@ -1439,14 +1445,14 @@ mod tests {
     fn test_minimal_url() {
         let url = Url::parse("https://example.com").unwrap();
         assert_eq!(url.scheme(), "https");
-        assert_eq!(url.host().to_string(), "example.com");
+        assert_eq!(url.host().unwrap().to_string(), "example.com");
         assert_eq!(url.port(), None);
         assert_eq!(url.path(), None);
         assert_eq!(url.query(), None);
         assert_eq!(url.fragment(), None);
         assert!(url.userinfo().is_none());
 
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "example.com");
         assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
@@ -1459,7 +1465,7 @@ mod tests {
         // With both username and password
         let url = Url::parse("https://user:pass@example.com").unwrap();
         assert_eq!(url.scheme(), "https");
-        assert_eq!(url.host().to_string(), "example.com");
+        assert_eq!(url.host().unwrap().to_string(), "example.com");
         let userinfo = url.userinfo().unwrap();
         assert_eq!(userinfo.username(), "user");
         assert_eq!(userinfo.password(), Some("pass"));
@@ -1558,7 +1564,7 @@ mod tests {
         let userinfo = url.userinfo().unwrap();
         assert_eq!(userinfo.username(), "user");
         assert_eq!(userinfo.password(), Some("pass"));
-        assert_eq!(url.host().to_string(), "sub.example.com");
+        assert_eq!(url.host().unwrap().to_string(), "sub.example.com");
         assert_eq!(url.port(), Some(8080));
         assert_eq!(url.path(), Some("/path/to/resource"));
         assert_eq!(url.query(), Some("key=value"));
@@ -1570,7 +1576,7 @@ mod tests {
     fn test_hostnames() {
         // Basic hostname
         let url = Url::parse("https://example.com").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "example.com");
         assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
@@ -1578,7 +1584,7 @@ mod tests {
 
         // Single-level subdomain
         let url = Url::parse("https://sub.example.com").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "sub.example.com");
         assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
@@ -1586,7 +1592,7 @@ mod tests {
 
         // Multi-level subdomain
         let url = Url::parse("https://a.b.example.com").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "a.b.example.com");
         assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
@@ -1597,7 +1603,7 @@ mod tests {
             "https://user:pass@sub1.sub2.example.com:8080/path/to/resource?key=value#section1",
         )
         .unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "sub1.sub2.example.com");
         assert_eq!(hn.suffix_str(), Some("com"));
         assert_eq!(hn.domain(), Some("example.com"));
@@ -1605,7 +1611,7 @@ mod tests {
 
         // Custom TLD
         let url = Url::parse("http://example.b32.i2p").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "example.b32.i2p");
         assert_eq!(hn.suffix_str(), Some("b32.i2p"));
         assert_eq!(hn.domain(), Some("example.b32.i2p"));
@@ -1614,7 +1620,7 @@ mod tests {
 
         // UTF-8 hostname
         let url = Url::parse("https://例子.测试").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "例子.测试");
         assert_eq!(hn.suffix_str(), Some("测试"));
         assert_eq!(hn.domain(), Some("例子.测试"));
@@ -1622,7 +1628,7 @@ mod tests {
 
         // UTF-8 subdomain
         let url = Url::parse("https://子域.例子.测试").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.full_name(), "子域.例子.测试");
         assert_eq!(hn.suffix_str(), Some("测试"));
         assert_eq!(hn.domain(), Some("例子.测试"));
@@ -1634,14 +1640,14 @@ mod tests {
     fn test_ip_hosts() {
         // IPv4
         let url = Url::parse("http://127.0.0.1").unwrap();
-        match url.host() {
+        match url.host().unwrap() {
             Host::Ip(IpAddr::V4(ip)) => assert_eq!(ip, &Ipv4Addr::new(127, 0, 0, 1)),
             _ => panic!("Expected IPv4 address"),
         }
 
         // IPv6
         let url = Url::parse("http://[::1]").unwrap();
-        match url.host() {
+        match url.host().unwrap() {
             Host::Ip(IpAddr::V6(ip)) => assert_eq!(ip, &Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
             _ => panic!("Expected IPv6 address"),
         }
@@ -1672,7 +1678,7 @@ mod tests {
 
         // No subdomain
         let url = Url::parse("https://example.com").unwrap();
-        let hn = url.host().as_hostname().unwrap();
+        let hn = url.host().unwrap().as_hostname().unwrap();
         assert_eq!(hn.subdomain(), None);
     }
 
@@ -1682,7 +1688,7 @@ mod tests {
         // URL-encoded characters
         let url =
             Url::parse("https://%40lex:adore:la:quiche@%61vec-des-œufs.be#et-des-lardons").unwrap();
-        assert_eq!(url.host().to_string(), "%61vec-des-œufs.be");
+        assert_eq!(url.host().unwrap().to_string(), "%61vec-des-œufs.be");
         let userinfo = url.userinfo().unwrap();
         assert_eq!(userinfo.username(), "%40lex");
         assert_eq!(userinfo.password(), Some("adore:la:quiche"));
@@ -1783,7 +1789,7 @@ mod tests {
         assert_eq!(u.scheme(), "https");
 
         // Test host components
-        assert_eq!(u.host().to_string(), "fonts.googleapis.com");
+        assert_eq!(u.host().unwrap().to_string(), "fonts.googleapis.com");
         assert_eq!(u.domain(), Some("fonts.googleapis.com"));
         assert_eq!(u.suffix_str(), Some("googleapis.com"));
 
@@ -1804,7 +1810,7 @@ mod tests {
         assert_eq!(u.scheme(), "https");
 
         // Test host components
-        assert_eq!(u.host().to_string(), "service.eloquant.cloud");
+        assert_eq!(u.host().unwrap().to_string(), "service.eloquant.cloud");
         assert_eq!(u.domain(), Some("eloquant.cloud"));
         assert_eq!(u.suffix_str(), Some("cloud"));
         assert_eq!(u.subdomain(), Some("service"));
@@ -1818,5 +1824,12 @@ mod tests {
 
         // Test query parameters
         assert_eq!(u.query(), Some("--69.1.5.9&ver=4.0.1.c-20210712"));
+    }
+
+    #[test]
+    fn test_url_no_host() {
+        let u = Url::parse("file:///tmp/thank you @claudex.txt").unwrap();
+        assert!(u.host().is_none());
+        assert_eq!(u.path(), Some("/tmp/thank you @claudex.txt"));
     }
 }
