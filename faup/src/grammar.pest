@@ -1,8 +1,8 @@
 url    = ${ SOI ~ scheme ~ "://" ~ userinfo? ~ host ~ (":" ~ port)? ~ path? ~ query? ~ fragment? ~ EOI }
 scheme =  { ASCII_ALPHANUMERIC+ }
 
-username = ${ (!(":" | "@" | WHITE_SPACE) ~ ANY)+ }
-password = ${ (!("@" | WHITE_SPACE) ~ ANY)+ }
+username = ${ (!(":" | "@" | "/" | "?" | "#" | "[" | "]" | WHITE_SPACE) ~ ANY)+ }
+password = ${ (!("@" | "/" | "?" | "#" | "[" | "]" | WHITE_SPACE) ~ ANY)+ }
 userinfo = ${ username ~ (":" ~ password)? ~ "@" }
 
 // this rule is used to check if the hostname is actually
