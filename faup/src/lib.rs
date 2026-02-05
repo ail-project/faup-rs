@@ -1774,4 +1774,26 @@ mod tests {
             )
         );
     }
+
+    #[test]
+    fn test_userinfo_bug() {
+        let u = Url::parse("https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,200..1000;1,200..1000&display=swap").unwrap();
+
+        // Test scheme
+        assert_eq!(u.scheme(), "https");
+
+        // Test host components
+        assert_eq!(u.host().to_string(), "fonts.googleapis.com");
+        assert_eq!(u.domain(), Some("fonts.googleapis.com"));
+        assert_eq!(u.suffix_str(), Some("googleapis.com"));
+
+        // Test path
+        assert_eq!(u.path(), Some("/css2"));
+
+        // Test query - complex query with special characters
+        assert_eq!(
+            u.query(),
+            Some("family=Mulish:ital,wght@0,200..1000;1,200..1000&display=swap")
+        );
+    }
 }
