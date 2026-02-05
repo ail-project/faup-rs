@@ -46,7 +46,7 @@ class Url:
     scheme: str
     username: Optional[str]
     password: Optional[str]
-    host: str
+    host: Optional[str]
     subdomain: Optional[str]
     domain: Optional[str]
     suffix: Optional[Suffix]
