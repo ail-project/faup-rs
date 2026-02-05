@@ -1796,4 +1796,27 @@ mod tests {
             Some("family=Mulish:ital,wght@0,200..1000;1,200..1000&display=swap")
         );
     }
+
+    #[test]
+    fn test_path_whitespace_bug() {
+        let u = Url::parse("https://service.eloquant.cloud/ca-interview/itw/efm/resource/com.interview.repondant.web.css.IRepondantCSS/respondent-style-CASA %28no logo%29.css?--69.1.5.9&ver=4.0.1.c-20210712").unwrap();
+        // Test scheme
+        assert_eq!(u.scheme(), "https");
+
+        // Test host components
+        assert_eq!(u.host().to_string(), "service.eloquant.cloud");
+        assert_eq!(u.domain(), Some("eloquant.cloud"));
+        assert_eq!(u.suffix_str(), Some("cloud"));
+        assert_eq!(u.subdomain(), Some("service"));
+
+        assert_eq!(
+            u.path(),
+            Some(
+                "/ca-interview/itw/efm/resource/com.interview.repondant.web.css.IRepondantCSS/respondent-style-CASA %28no logo%29.css"
+            )
+        );
+
+        // Test query parameters
+        assert_eq!(u.query(), Some("--69.1.5.9&ver=4.0.1.c-20210712"));
+    }
 }

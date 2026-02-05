@@ -20,7 +20,7 @@ encoded_char = ${ "%" ~ ASCII_DIGIT{2} }
 
 port = ${ ASCII_ALPHANUMERIC{,5} }
 
-path_segment = ${ (encoded_char | (!("?" | "/" | "#" | WHITE_SPACE) ~ ANY))* }
+path_segment = ${ (encoded_char | (!("?" | "/" | "#") ~ ANY))* }
 path         = ${ ("/" ~ path_segment)+ }
 
 query_char    = ${ (!("#") ~ ANY) }
