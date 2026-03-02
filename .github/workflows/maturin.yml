@@ -235,7 +235,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: [linux, musllinux, windows, macos, sdist]
     permissions:
       # Use to sign the release artifacts
@@ -252,6 +251,7 @@ jobs:
       - name: Check for pyfaup-rs tag
         id: check-tag
         run: |
+          set -euxo pipefail
           # Get all tags for the current commit
           tags=$(git tag --points-at HEAD)
           # Check if any tag matches pyfaup-rs-v* pattern
