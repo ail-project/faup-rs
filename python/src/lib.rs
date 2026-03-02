@@ -188,7 +188,9 @@ impl Hostname {
         let h = faup_rs::Host::parse(hn).map_err(|e| PyValueError::new_err(e.to_string()))?;
         match h {
             faup_rs::Host::Hostname(h) => Ok(h.into()),
-            faup_rs::Host::Ip(_) => Err(PyValueError::new_err("invalid hostname")),
+            faup_rs::Host::IpV4(_) | faup_rs::Host::IpV6(_, _) => {
+                Err(PyValueError::new_err("invalid hostname"))
+            }
         }
     }
 
@@ -202,15 +204,18 @@ impl Hostname {
 pub enum Host {
     /// A hostname (domain name).
     Hostname(Hostname),
-    /// An IP address (either IPv4 or IPv6).
-    Ip(IpAddr),
+    /// An IPv4 address
+    Ipv4(IpAddr),
+    /// An IPv6 address
+    Ipv6(IpAddr),
 }
 
 impl From<faup_rs::Host<'_>> for Host {
     fn from(value: faup_rs::Host) -> Self {
         match value {
             faup_rs::Host::Hostname(h) => Host::Hostname(h.into()),
-            faup_rs::Host::Ip(ip) => Host::Ip(ip),
+            faup_rs::Host::IpV4(ip) => Host::Ipv4(ip),
+            faup_rs::Host::IpV6(ip, _) => Host::Ipv6(ip.into()),
         }
     }
 }
@@ -272,7 +277,9 @@ impl Host {
     pub fn try_into_hostname(&self) -> PyResult<Hostname> {
         match self {
             Host::Hostname(h) => Ok(h.clone()),
-            Host::Ip(_) => Err(PyValueError::new_err("host object is not a hostname")),
+            Host::Ipv4(_) | Host::Ipv6(_) => {
+                Err(PyValueError::new_err("host object is not a hostname"))
+            }
         }
     }
 
@@ -299,7 +306,8 @@ impl Host {
     pub fn try_into_ip(&self) -> PyResult<String> {
         match self {
             Host::Hostname(_) => Err(PyValueError::new_err("host object is not an ip address")),
-            Host::Ip(ip) => Ok(ip.to_string()),
+            Host::Ipv4(ip) => Ok(ip.to_string()),
+            Host::Ipv6(ip) => Ok(ip.to_string()),
         }
     }
 
@@ -324,7 +332,7 @@ impl Host {
     ///     >>> print(Host("::1").is_ipv4())          # False
     #[inline(always)]
     pub fn is_ipv4(&self) -> bool {
-        matches!(self, Host::Ip(IpAddr::V4(_)))
+        matches!(self, Host::Ipv4(IpAddr::V4(_)))
     }
 
     /// Returns `True` if the host is an IPv6 address.
@@ -336,7 +344,7 @@ impl Host {
     ///     >>> print(Host("192.168.1.1").is_ipv6())  # False
     #[inline(always)]
     pub fn is_ipv6(&self) -> bool {
-        matches!(self, Host::Ip(IpAddr::V6(_)))
+        matches!(self, Host::Ipv6(IpAddr::V6(_)))
     }
 
     /// Returns `True` if the host is an IP address (either IPv4 or IPv6).
@@ -354,7 +362,8 @@ impl Host {
     pub fn __str__(&self) -> String {
         match self {
             Self::Hostname(h) => h.hostname.clone(),
-            Self::Ip(ip) => ip.to_string(),
+            Self::Ipv4(ip) => ip.to_string(),
+            Self::Ipv6(ip) => ip.to_string(),
         }
     }
 }
@@ -434,7 +443,8 @@ impl From<faup_rs::Url<'_>> for Url {
                 suffix = hostname.suffix().map(|s| s.into());
                 Some(hostname.full_name().into())
             }
-            Some(faup_rs::Host::Ip(ip)) => Some(ip.to_string()),
+            Some(faup_rs::Host::IpV4(ip)) => Some(ip.to_string()),
+            Some(faup_rs::Host::IpV6(ip, _)) => Some(ip.to_string()),
             None => None,
         };
 
@@ -605,7 +615,10 @@ impl FaupCompat {
     }
 
     fn get_host(&self) -> Option<&str> {
-        self.url.as_ref().map(|u| u.host.as_ref())?.map(|h| h.as_ref())
+        self.url
+            .as_ref()
+            .map(|u| u.host.as_ref())?
+            .map(|h| h.as_ref())
     }
 
     fn get_resource_path(&self) -> Option<&str> {
