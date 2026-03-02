@@ -65,7 +65,7 @@
 //! use faup_rs::Url;
 //!
 //! let url = Url::parse("http://[::1]").unwrap();
-//! assert!(matches!(url.host().unwrap(), faup_rs::Host::Ip(ip) if ip.is_loopback()));
+//! assert!(matches!(url.host().unwrap(), faup_rs::Host::IpV6(ip, _) if ip.is_loopback()));
 //!```
 //!
 //! ### User Info (UTF-8 Support)
@@ -120,7 +120,10 @@ use std::{
     str::FromStr,
 };
 
-use pest::{Parser, iterators::Pair};
+use pest::{
+    Parser,
+    iterators::{Pair, Pairs},
+};
 use thiserror::Error;
 
 mod parser;
@@ -164,25 +167,12 @@ pub enum Error {
     #[error("invalid host")]
     InvalidHost,
 
-    /// Generic error for other parsing issues.
-    ///
-    /// This error is used for various parsing problems that don't fit
-    /// the more specific error categories.
-    #[error("{0}")]
-    Other(String),
-
     /// Parsing error from the underlying pest parser.
     ///
     /// This error occurs when the URL string doesn't conform to
     /// the expected grammar structure.
     #[error("parser error: {0}")]
     Parse(#[from] Box<pest::error::Error<Rule>>),
-}
-
-impl Error {
-    fn other<S: AsRef<str>>(s: S) -> Self {
-        Error::Other(s.as_ref().to_string())
-    }
 }
 
 /// Classification of a suffix (Top-Level Domain) based on its origin and validity.
@@ -720,15 +710,21 @@ impl<'url> Hostname<'url> {
 pub enum Host<'url> {
     /// A hostname (domain name).
     Hostname(Hostname<'url>),
-    /// An IP address (either IPv4 or IPv6).
-    Ip(IpAddr),
+    /// An IPv4 address
+    IpV4(IpAddr),
+    /// An IPv6 address
+    IpV6(Ipv6Addr, Option<Cow<'url, str>>),
 }
 
 impl fmt::Display for Host<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Host::Hostname(hostname) => write!(f, "{}", hostname.full_name()),
-            Host::Ip(ip) => write!(f, "{ip}"),
+            Host::IpV4(ip) => write!(f, "{ip}"),
+            Host::IpV6(ip, ozid) => match ozid {
+                Some(zid) => write!(f, "{ip}%{zid}"),
+                None => write!(f, "{ip}"),
+            },
         }
     }
 }
@@ -737,37 +733,49 @@ impl<'host> Host<'host> {
     fn into_owned<'owned>(self) -> Host<'owned> {
         match self {
             Host::Hostname(h) => Host::Hostname(h.into_owned()),
-            Host::Ip(ip) => Host::Ip(ip),
+            Host::IpV4(ip) => Host::IpV4(ip),
+            Host::IpV6(ip, zone_id) => {
+                Host::IpV6(ip, zone_id.map(|zid| Cow::Owned(zid.into_owned())))
+            }
         }
     }
 
     #[inline(always)]
-    fn from_pair(host_pair: Pair<'host, Rule>) -> Result<Self, Error> {
-        match host_pair.as_rule() {
-            Rule::hostname => {
-                if let Ok(ipv4) =
-                    UrlParser::parse(Rule::ipv4, host_pair.as_str()).map(|p| p.as_str())
-                {
-                    Ok(Ipv4Addr::from_str(ipv4)
-                        .map(IpAddr::from)
-                        .map(Host::Ip)
-                        .map_err(|_| Error::InvalidIPv4)?)
-                } else {
-                    Ok(Host::Hostname(Hostname::from_str(host_pair.as_str())))
-                }
-            }
+    fn from_pairs(mut pairs: Pairs<'host, Rule>) -> Result<Self, Error> {
+        let mut host = None;
 
-            Rule::ipv6 => Ok(Ipv6Addr::from_str(
-                host_pair.as_str().trim_matches(|c| c == '[' || c == ']'),
-            )
-            .map(IpAddr::from)
-            .map(Host::Ip)
-            .map_err(|_| Error::InvalidIPv6)?),
-            _ => Err(Error::other(format!(
-                "unexpected parsing rule: {:?}",
-                host_pair.as_rule()
-            ))),
+        while let Some(pair) = pairs.next() {
+            match pair.as_rule() {
+                Rule::hostname => {
+                    if let Ok(ipv4) =
+                        UrlParser::parse(Rule::ipv4, pair.as_str()).map(|p| p.as_str())
+                    {
+                        host = Some(
+                            Ipv4Addr::from_str(ipv4)
+                                .map(IpAddr::from)
+                                .map(Host::IpV4)
+                                .map_err(|_| Error::InvalidIPv4)?,
+                        );
+                    } else {
+                        host = Some(Host::Hostname(Hostname::from_str(pair.as_str())));
+                    }
+                }
+
+                Rule::ipv6 => {
+                    let ip_addr =
+                        Ipv6Addr::from_str(pair.as_str().trim_matches(|c| c == '[' || c == ']'))
+                            .map_err(|_| Error::InvalidIPv6)?;
+
+                    let zone_id = pairs.next().map(|p| Cow::Borrowed(p.as_str()));
+
+                    host = Some(Host::IpV6(ip_addr, zone_id));
+                }
+
+                _ => {}
+            }
         }
+
+        Ok(host.unwrap())
     }
 
     /// Parses a string into a `Host` enum.
@@ -790,15 +798,15 @@ impl<'host> Host<'host> {
     ///
     /// // Parse an IPv4 address
     /// let host = Host::parse("127.0.0.1").unwrap();
-    /// assert!(matches!(host, Host::Ip(std::net::IpAddr::V4(_))));
+    /// assert!(host.is_ipv4());
     ///
     /// // Parse an IPv6 address
     /// let host = Host::parse("::1").unwrap();
-    /// assert!(matches!(host, Host::Ip(std::net::IpAddr::V6(_))));
+    /// assert!(host.is_ipv6());
     ///
     /// // Parse a hostname
     /// let host = Host::parse("example.com").unwrap();
-    /// assert!(matches!(host, Host::Hostname(_)));
+    /// assert!(host.is_hostname());
     ///
     /// // Parse a hostname with a subdomain
     /// let host = Host::parse("sub.example.com").unwrap();
@@ -814,12 +822,8 @@ impl<'host> Host<'host> {
     /// ```
     #[inline]
     pub fn parse(host: &'host str) -> Result<Self, Error> {
-        Self::from_pair(
-            UrlParser::parse(Rule::checked_host, host)
-                .map_err(|_| Error::InvalidHost)?
-                .next()
-                // this should not panic as parser guarantee some pair exist
-                .expect("expecting host pair"),
+        Self::from_pairs(
+            UrlParser::parse(Rule::checked_host, host).map_err(|_| Error::InvalidHost)?,
         )
     }
 
@@ -833,6 +837,56 @@ impl<'host> Host<'host> {
             Host::Hostname(h) => Some(h),
             _ => None,
         }
+    }
+    /// Returns `true` if this host is a hostname (domain name).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Host;
+    ///
+    /// let host = Host::parse("example.com").unwrap();
+    /// assert!(host.is_hostname());
+    ///
+    /// let host = Host::parse("192.168.1.1").unwrap();
+    /// assert!(!host.is_hostname());
+    /// ```
+    pub fn is_hostname(&self) -> bool {
+        matches!(self, Host::Hostname(_))
+    }
+
+    /// Returns `true` if this host is an IPv4 address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Host;
+    ///
+    /// let host = Host::parse("192.168.1.1").unwrap();
+    /// assert!(host.is_ipv4());
+    ///
+    /// let host = Host::parse("example.com").unwrap();
+    /// assert!(!host.is_ipv4());
+    /// ```
+    pub fn is_ipv4(&self) -> bool {
+        matches!(self, Host::IpV4(_))
+    }
+
+    /// Returns `true` if this host is an IPv6 address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use faup_rs::Host;
+    ///
+    /// let host = Host::parse("::1").unwrap();
+    /// assert!(host.is_ipv6());
+    ///
+    /// let host = Host::parse("example.com").unwrap();
+    /// assert!(!host.is_ipv6());
+    /// ```
+    pub fn is_ipv6(&self) -> bool {
+        matches!(self, Host::IpV6(_, _))
     }
 }
 
@@ -1012,11 +1066,7 @@ impl<'url> Url<'url> {
                     scheme = Some(Cow::Borrowed(p.as_str()));
                 }
                 Rule::userinfo => userinfo = Some(UserInfo::from_pair(p)),
-                Rule::host => {
-                    // cannot panic guarantee by parser
-                    let host_pair = p.into_inner().next().unwrap();
-                    host = Some(Host::from_pair(host_pair)?)
-                }
+                Rule::host => host = Some(Host::from_pairs(p.into_inner())?),
                 Rule::port => {
                     port = Some(u16::from_str(p.as_str()).map_err(|_| Error::InvalidPort)?)
                 }
@@ -1641,14 +1691,14 @@ mod tests {
         // IPv4
         let url = Url::parse("http://127.0.0.1").unwrap();
         match url.host().unwrap() {
-            Host::Ip(IpAddr::V4(ip)) => assert_eq!(ip, &Ipv4Addr::new(127, 0, 0, 1)),
+            Host::IpV4(IpAddr::V4(ip)) => assert_eq!(ip, &Ipv4Addr::new(127, 0, 0, 1)),
             _ => panic!("Expected IPv4 address"),
         }
 
         // IPv6
         let url = Url::parse("http://[::1]").unwrap();
         match url.host().unwrap() {
-            Host::Ip(IpAddr::V6(ip)) => assert_eq!(ip, &Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+            Host::IpV6(ip, _) => assert_eq!(ip, &Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
             _ => panic!("Expected IPv6 address"),
         }
 
@@ -1703,11 +1753,11 @@ mod tests {
     fn test_host_from_str() {
         // Valid IPv4
         let host = Host::parse("127.0.0.1").unwrap();
-        assert!(matches!(host, Host::Ip(std::net::IpAddr::V4(_))));
+        assert!(matches!(host, Host::IpV4(std::net::IpAddr::V4(_))));
 
         // Valid IPv6
         let host = Host::parse("::1").unwrap();
-        assert!(matches!(host, Host::Ip(std::net::IpAddr::V6(_))));
+        assert!(matches!(host, Host::IpV6(_, _)));
 
         let host = Host::parse("[::1]");
         assert!(matches!(host, Err(Error::InvalidHost)));
@@ -1831,5 +1881,12 @@ mod tests {
         let u = Url::parse("file:///tmp/thank you @claudex.txt").unwrap();
         assert!(u.host().is_none());
         assert_eq!(u.path(), Some("/tmp/thank you @claudex.txt"));
+    }
+
+    #[test]
+    fn test_url_zone_id() {
+        Url::parse("imap://user:password;crazy@[ff00::1234%hello]:1234/path?a=b&c=d#fragment")
+            .inspect_err(|e| println!("{e}"))
+            .unwrap();
     }
 }
