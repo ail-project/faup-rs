@@ -16,6 +16,9 @@ on:
       - "*"
   pull_request:
   workflow_dispatch:
+  workflow_run:
+    workflows: [Weekly PSL Update and Patch Release]
+    types: [completed]
 
 permissions:
   contents: read
