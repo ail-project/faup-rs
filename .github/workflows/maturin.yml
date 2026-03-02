@@ -16,6 +16,9 @@ on:
       - "*"
   pull_request:
   workflow_dispatch:
+  workflow_run:
+    workflows: [Weekly PSL Update and Patch Release]
+    types: [completed]
 
 permissions:
   contents: read
@@ -232,11 +235,34 @@ jobs:
           name: wheels-sdist
           path: dist
 
+  check-tag:
+    name: Check for pyfaup-rs tag
+    runs-on: ubuntu-latest
+    needs: [linux, musllinux, windows, macos, sdist]
+    outputs:
+      has_pyfaup_tag: ${{ steps.check-tag.outputs.has_pyfaup_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check for pyfaup-rs tag
+        id: check-tag
+        run: |
+          set -euxo pipefail
+          # Get all tags for the current commit
+          tags=$(git tag --points-at HEAD)
+          # Check if any tag matches pyfaup-rs-v* pattern
+          if echo "$tags" | grep -qE '^pyfaup-rs-v'; then
+            echo "has_pyfaup_tag=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_pyfaup_tag=false" >> $GITHUB_OUTPUT
+          fi
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/pyfaup-rs-v') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [check-tag]
+    if: needs.check-tag.outputs.has_pyfaup_tag == 'true'
     permissions:
       # Use to sign the release artifacts
       id-token: write
@@ -252,8 +278,6 @@ jobs:
         with:
           subject-path: "wheels-*/*"
       - name: Install uv
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: astral-sh/setup-uv@v7
       - name: Publish to PyPI
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: uv publish 'wheels-*/*'
