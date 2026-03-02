@@ -235,18 +235,12 @@ jobs:
           name: wheels-sdist
           path: dist
 
-  release:
-    name: Release
+  check-tag:
+    name: Check for pyfaup-rs tag
     runs-on: ubuntu-latest
     needs: [linux, musllinux, windows, macos, sdist]
-    permissions:
-      # Use to sign the release artifacts
-      id-token: write
-      # Used to upload release artifacts
-      contents: write
-      # Used to generate artifact attestation
-      attestations: write
-    environment: release
+    outputs:
+      has_pyfaup_tag: ${{ steps.check-tag.outputs.has_pyfaup_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -263,17 +257,27 @@ jobs:
           else
             echo "has_pyfaup_tag=false" >> $GITHUB_OUTPUT
           fi
-      - name: Download artifacts
-        if: steps.check-tag.outputs.has_pyfaup_tag == 'true'
-        uses: actions/download-artifact@v6
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [check-tag]
+    if: needs.check-tag.outputs.has_pyfaup_tag == 'true'
+    permissions:
+      # Use to sign the release artifacts
+      id-token: write
+      # Used to upload release artifacts
+      contents: write
+      # Used to generate artifact attestation
+      attestations: write
+    environment: release
+    steps:
+      - uses: actions/download-artifact@v6
       - name: Generate artifact attestation
-        if: steps.check-tag.outputs.has_pyfaup_tag == 'true'
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: "wheels-*/*"
       - name: Install uv
-        if: steps.check-tag.outputs.has_pyfaup_tag == 'true'
         uses: astral-sh/setup-uv@v7
       - name: Publish to PyPI
-        if: steps.check-tag.outputs.has_pyfaup_tag == 'true'
         run: uv publish 'wheels-*/*'
