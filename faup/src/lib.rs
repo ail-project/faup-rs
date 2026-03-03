@@ -516,6 +516,7 @@ impl<'url> Hostname<'url> {
     }
 
     fn from_str(hostname: &'url str) -> Self {
+        let hostname = hostname.trim_end_matches(".");
         let suffix = suffix(hostname);
 
         let domain = if let Some(suffix) = suffix.as_ref() {
@@ -1483,6 +1484,7 @@ mod tests {
             "https://alex:adore-la-quiche@avec-des-œufs.be#et-des-lardons",
             "https://%40lex:adore:la:quiche@%61vec-des-œufs.be/../../..some/directory/traversal/../#et-des-lardons",
             "https://44.129.205.92.host.secureserver.net",
+            "http://shops.myshopify.com./",
         ];
 
         for url in test_urls {
@@ -1891,5 +1893,40 @@ mod tests {
         Url::parse("imap://user:password;crazy@[ff00::1234%hello]:1234/path?a=b&c=d#fragment")
             .inspect_err(|e| println!("{e}"))
             .unwrap();
+    }
+
+    /// Test URLs with trailing dots in hostname
+    #[test]
+    fn test_url_trailing_dot() {
+        // URL with trailing dot in hostname
+        let url = Url::parse("http://shops.myshopify.com./").unwrap();
+        assert_eq!(url.host().unwrap().to_string(), "shops.myshopify.com");
+
+        // URL with trailing dot and path
+        let url = Url::parse("http://shops.myshopify.com./path").unwrap();
+        assert_eq!(url.host().unwrap().to_string(), "shops.myshopify.com");
+        assert_eq!(url.path(), Some("/path"));
+
+        // URL with trailing dot and query
+        let url = Url::parse("http://shops.myshopify.com.?query=value").unwrap();
+        assert_eq!(url.host().unwrap().to_string(), "shops.myshopify.com");
+        assert_eq!(url.query(), Some("query=value"));
+
+        // URL with trailing dot and fragment
+        let url = Url::parse("http://shops.myshopify.com.#fragment").unwrap();
+        assert_eq!(url.host().unwrap().to_string(), "shops.myshopify.com");
+        assert_eq!(url.fragment(), Some("fragment"));
+
+        // URL with trailing dot and port
+        let url = Url::parse("http://shops.myshopify.com.:8080").unwrap();
+        assert_eq!(url.host().unwrap().to_string(), "shops.myshopify.com");
+        assert_eq!(url.port(), Some(8080));
+
+        // URL with trailing dot and userinfo
+        let url = Url::parse("http://user:pass@shops.myshopify.com./").unwrap();
+        assert_eq!(url.host().unwrap().to_string(), "shops.myshopify.com");
+        let userinfo = url.userinfo().unwrap();
+        assert_eq!(userinfo.username(), "user");
+        assert_eq!(userinfo.password(), Some("pass"));
     }
 }
