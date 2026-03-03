@@ -21,10 +21,13 @@ class TestPyFaupRR(unittest.TestCase):
         self.assertEqual(parsed_url.scheme, "https")
         self.assertEqual(parsed_url.username, "user")
         self.assertEqual(parsed_url.password, "pass")
-        self.assertEqual(parsed_url.host, "sub.example.com")
-        self.assertEqual(parsed_url.subdomain, "sub")
-        self.assertEqual(parsed_url.domain, "example.com")
-        self.assertEqual(parsed_url.suffix, "com")
+        self.assertEqual(str(parsed_url.host), "sub.example.com")
+        if parsed_url.host is not None:
+            self.assertEqual(parsed_url.host.subdomain(), "sub")
+        if parsed_url.host is not None:
+            self.assertEqual(parsed_url.host.domain(), "example.com")
+        if parsed_url.host is not None: 
+            self.assertEqual(parsed_url.host.suffix(), "com")
         self.assertEqual(parsed_url.port, 8080)
         self.assertEqual(parsed_url.path, "/path")
         self.assertEqual(parsed_url.query, "query=value")
@@ -102,6 +105,31 @@ class TestPyFaupRR(unittest.TestCase):
         self.assertEqual(str(hn.suffix), "com")
         with self.assertRaises(ValueError):
             host.try_into_ip()
+
+        # Test domain(), subdomain(), and suffix() methods
+        host = Host("sub.example.com")
+        self.assertEqual(host.domain(), "example.com")
+        self.assertEqual(host.subdomain(), "sub")
+        self.assertIsNotNone(host.suffix())
+        self.assertEqual(str(host.suffix()), "com")
+
+        # Test domain(), subdomain(), and suffix() with simple domain
+        host = Host("example.com")
+        self.assertEqual(host.domain(), "example.com")
+        self.assertIsNone(host.subdomain())
+        self.assertIsNotNone(host.suffix())
+        self.assertEqual(str(host.suffix()), "com")
+
+        # Test domain(), subdomain(), and suffix() with IP addresses
+        host = Host("192.168.1.1")
+        self.assertIsNone(host.domain())
+        self.assertIsNone(host.subdomain())
+        self.assertIsNone(host.suffix())
+
+        host = Host("::1")
+        self.assertIsNone(host.domain())
+        self.assertIsNone(host.subdomain())
+        self.assertIsNone(host.suffix())
 
         # Test invalid host
         with self.assertRaises(ValueError):
