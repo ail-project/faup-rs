@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{fmt::Display, net::IpAddr};
 
 use pyo3::{
     basic::CompareOp,
@@ -201,6 +201,7 @@ impl Hostname {
 
 /// Represents a host, which can be either a [`Hostname`] or an [`IpAddr`].
 #[pyclass]
+#[derive(Clone)]
 pub enum Host {
     /// A hostname (domain name).
     Hostname(Hostname),
@@ -216,6 +217,26 @@ impl From<faup_rs::Host<'_>> for Host {
             faup_rs::Host::Hostname(h) => Host::Hostname(h.into()),
             faup_rs::Host::IpV4(ip) => Host::Ipv4(ip),
             faup_rs::Host::IpV6(ip, _) => Host::Ipv6(ip.into()),
+        }
+    }
+}
+
+impl Display for Host {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Hostname(h) => write!(f, "{}", h.hostname.clone()),
+            Self::Ipv4(ip) => write!(f, "{ip}"),
+            Self::Ipv6(ip) => write!(f, "{ip}"),
+        }
+    }
+}
+
+impl Host {
+    #[inline(always)]
+    fn suffix_ref(&self) -> Option<&Suffix> {
+        match self {
+            Host::Hostname(hostname) => hostname.suffix.as_ref(),
+            Host::Ipv4(_ip_addr) | Host::Ipv6(_ip_addr) => None,
         }
     }
 }
@@ -359,12 +380,80 @@ impl Host {
         self.is_ipv4() | self.is_ipv6()
     }
 
-    pub fn __str__(&self) -> String {
+    /// Returns the domain part of the hostname if this host is a hostname.
+    ///
+    /// Returns `None` if this host is an IP address or if the hostname has no recognized domain.
+    ///
+    /// # Returns
+    ///
+    /// * `Optional[str]` - The domain part of the hostname, or `None` if not applicable.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> host = Host("sub.example.com")
+    ///     >>> print(host.domain())  # "example.com"
+    ///     >>> print(Host("192.168.1.1").domain())  # None
+    pub fn domain(&self) -> Option<&str> {
         match self {
-            Self::Hostname(h) => h.hostname.clone(),
-            Self::Ipv4(ip) => ip.to_string(),
-            Self::Ipv6(ip) => ip.to_string(),
+            Host::Hostname(hostname) => hostname.domain.as_ref().map(String::as_ref),
+            Host::Ipv4(_ip_addr) | Host::Ipv6(_ip_addr) => None,
         }
+    }
+
+    /// Returns the subdomain part of the hostname if this host is a hostname.
+    ///
+    /// Returns `None` if this host is an IP address or if the hostname has no subdomain.
+    ///
+    /// # Returns
+    ///
+    /// * `Optional[str]` - The subdomain part of the hostname, or `None` if not applicable.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> host = Host("sub.example.com")
+    ///     >>> print(host.subdomain())  # "sub"
+    ///     >>> print(Host("example.com").subdomain())  # None
+    ///     >>> print(Host("192.168.1.1").subdomain())  # None
+    pub fn subdomain(&self) -> Option<&str> {
+        match self {
+            Host::Hostname(hostname) => hostname.subdomain.as_ref().map(String::as_ref),
+            Host::Ipv4(_ip_addr) | Host::Ipv6(_ip_addr) => None,
+        }
+    }
+
+    /// Returns the suffix (public suffix) of the hostname if this host is a hostname.
+    ///
+    /// Returns `None` if this host is an IP address or if the hostname has no recognized suffix.
+    ///
+    /// # Returns
+    ///
+    /// * `Optional[Suffix]` - The suffix of the hostname, or `None` if not applicable.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> host = Host("sub.example.com")
+    ///     >>> print(host.suffix())  # Suffix(com, True)
+    ///     >>> print(Host("192.168.1.1").suffix())  # None
+    pub fn suffix(&self) -> Option<Suffix> {
+        self.suffix_ref().cloned()
+    }
+
+    /// Returns the string representation of the host.
+    ///
+    /// # Returns
+    ///
+    /// * `str` - The string representation of the host.
+    ///
+    /// # Example
+    ///
+    ///     >>> from pyfaup import Host
+    ///     >>> print(str(Host("example.com")))  # "example.com"
+    ///     >>> print(str(Host("192.168.1.1")))  # "192.168.1.1"
+    pub fn __str__(&self) -> String {
+        self.to_string()
     }
 }
 
@@ -405,13 +494,7 @@ pub struct Url {
     #[pyo3(get)]
     pub password: Option<String>,
     #[pyo3(get)]
-    pub host: Option<String>,
-    #[pyo3(get)]
-    pub subdomain: Option<String>,
-    #[pyo3(get)]
-    pub domain: Option<String>,
-    #[pyo3(get)]
-    pub suffix: Option<Suffix>,
+    pub host: Option<Host>,
     #[pyo3(get)]
     pub port: Option<u16>,
     #[pyo3(get)]
@@ -424,10 +507,6 @@ pub struct Url {
 
 impl From<faup_rs::Url<'_>> for Url {
     fn from(value: faup_rs::Url<'_>) -> Self {
-        let mut subdomain = None;
-        let mut domain = None;
-        let mut suffix = None;
-
         let (username, password) = match value.userinfo() {
             Some(u) => (
                 Some(u.username().to_string()),
@@ -436,31 +515,24 @@ impl From<faup_rs::Url<'_>> for Url {
             None => (None, None),
         };
 
-        let host = match value.host() {
-            Some(faup_rs::Host::Hostname(hostname)) => {
-                subdomain = hostname.subdomain().map(|s| s.into());
-                domain = hostname.domain().map(|d| d.into());
-                suffix = hostname.suffix().map(|s| s.into());
-                Some(hostname.full_name().into())
-            }
-            Some(faup_rs::Host::IpV4(ip)) => Some(ip.to_string()),
-            Some(faup_rs::Host::IpV6(ip, _)) => Some(ip.to_string()),
-            None => None,
-        };
+        let orig = value.as_str().into();
+        let scheme = value.scheme().into();
+        let port = value.port();
+        let path = value.path().map(|p| p.into());
+        let query = value.query().map(|q| q.into());
+        let fragment = value.fragment().map(|f| f.into());
+        let host = value.host.map(Host::from);
 
         Self {
-            orig: value.as_str().into(),
-            scheme: value.scheme().into(),
+            orig,
+            scheme,
             username,
             password,
             host,
-            subdomain,
-            domain,
-            suffix,
-            port: value.port(),
-            path: value.path().map(|p| p.into()),
-            query: value.query().map(|q| q.into()),
-            fragment: value.fragment().map(|f| f.into()),
+            port,
+            path,
+            query,
+            fragment,
         }
     }
 }
@@ -584,12 +656,22 @@ impl FaupCompat {
         let credentials = url.and_then(|u| u.credentials());
 
         m.set_item("credentials", credentials)?;
-        m.set_item("domain", url.and_then(|u| u.domain.clone()))?;
-        m.set_item("subdomain", url.and_then(|u| u.subdomain.clone()))?;
+        m.set_item(
+            "domain",
+            url.and_then(|u| u.host.as_ref()).and_then(|h| h.domain()),
+        )?;
+        m.set_item(
+            "subdomain",
+            url.and_then(|u| u.host.as_ref())
+                .and_then(|h| h.subdomain()),
+        )?;
         m.set_item("fragment", url.and_then(|u| u.fragment.clone()))?;
         m.set_item("host", url.map(|u| u.host.clone()))?;
         m.set_item("resource_path", url.and_then(|u| u.path.clone()))?;
-        m.set_item("tld", url.and_then(|u| u.suffix.clone()))?;
+        m.set_item(
+            "tld",
+            url.and_then(|u| u.host.as_ref()).and_then(|h| h.suffix()),
+        )?;
         m.set_item("query_string", url.and_then(|u| u.query.clone()))?;
         m.set_item("scheme", url.map(|u| u.scheme.clone()))?;
         m.set_item("port", url.map(|u| u.port))?;
@@ -603,22 +685,28 @@ impl FaupCompat {
     }
 
     fn get_domain(&self) -> Option<&str> {
-        self.url.as_ref()?.domain.as_deref()
+        self.url
+            .as_ref()
+            .and_then(|u| u.host.as_ref())
+            .and_then(|h| h.domain())
     }
 
     fn get_subdomain(&self) -> Option<&str> {
-        self.url.as_ref()?.subdomain.as_deref()
+        self.url
+            .as_ref()
+            .and_then(|u| u.host.as_ref())
+            .and_then(|h| h.subdomain())
     }
 
     fn get_fragment(&self) -> Option<&str> {
         self.url.as_ref()?.fragment.as_deref()
     }
 
-    fn get_host(&self) -> Option<&str> {
+    fn get_host(&self) -> Option<String> {
         self.url
             .as_ref()
-            .map(|u| u.host.as_ref())?
-            .map(|h| h.as_ref())
+            .and_then(|u| u.host.as_ref())
+            .map(|h| h.to_string())
     }
 
     fn get_resource_path(&self) -> Option<&str> {
@@ -626,7 +714,11 @@ impl FaupCompat {
     }
 
     fn get_tld(&self) -> Option<&str> {
-        self.url.as_ref()?.suffix.as_ref().map(|s| s.value.as_str())
+        self.url
+            .as_ref()
+            .and_then(|u| u.host.as_ref())
+            .and_then(|h| h.suffix_ref())
+            .map(|s| s.value.as_str())
     }
 
     fn get_query_string(&self) -> Option<&str> {

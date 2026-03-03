@@ -1036,7 +1036,10 @@ pub struct Url<'url> {
     orig: Cow<'url, str>,
     scheme: Cow<'url, str>,
     userinfo: Option<UserInfo<'url>>,
-    host: Option<Host<'url>>,
+    /// The host component of the URL, which can be a hostname, IPv4 address, or IPv6 address.
+    ///
+    /// This field is `None` if the URL does not contain a host component.
+    pub host: Option<Host<'url>>,
     port: Option<u16>,
     path: Option<Cow<'url, str>>,
     query: Option<Cow<'url, str>>,
