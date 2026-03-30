@@ -238,7 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [linux, musllinux, windows, macos, sdist]
     outputs:
-      has_pyfaup_tag: ${{ steps.check-tag.outputs.has_pyfaup_tag }}
+      publish: ${{ steps.check-pypi.outputs.publish }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -255,12 +255,25 @@ jobs:
           else
             echo "has_pyfaup_tag=false" >> $GITHUB_OUTPUT
           fi
+      - name: Check if version exists on PyPI
+        if: steps.check-tag.outputs.has_pyfaup_tag == 'true'
+        id: check-pypi
+        run: |
+          set -euxo pipefail
+          VERSION=$(git tag --points-at HEAD | grep 'pyfaup-rs' | head -1 | cut -d'-' -f3)
+          RESPONSE=$(curl -s "https://pypi.org/pypi/pyfaup-rs/$VERSION/json" | jq '.message')
+          if echo "$RESPONSE" | grep -qEi "Not Found"; then
+            echo "publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION already exists on PyPI"
+            echo "publish=false" >> $GITHUB_OUTPUT
+          fi
 
   release:
     name: Release
     runs-on: ubuntu-latest
     needs: [check-tag]
-    if: needs.check-tag.outputs.has_pyfaup_tag == 'true'
+    if: needs.check-tag.publish == 'true'
     permissions:
       # Use to sign the release artifacts
       id-token: write
