@@ -1,9 +1,8 @@
 [workspace]
-members = ["faup", "python"]
 resolver = "3"
+members = ["faup", "python"]
 
 [workspace.package]
-authors = ["quentin.jerome@circl.lu"]
-repository = "https://github.com/ail-project/faup-rs"
 readme = "README.md"
+repository = "https://github.com/ail-project/faup-rs"
 license = "GPL-3.0"

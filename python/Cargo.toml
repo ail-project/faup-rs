@@ -2,17 +2,16 @@
 name = "pyfaup-rs"
 version = "0.4.25"
 edition = "2021"
-description = "Python bindings for faup-rs"
-authors.workspace = true
-repository.workspace = true
 rust-version = "1.85.1"
+description = "Python bindings for faup-rs"
 readme = "README.md"
+repository.workspace = true
 publish = false
 
 [lib]
-name = "pyfaup"
 crate-type = ["cdylib"]
+name = "pyfaup"
 
 [dependencies]
-pyo3 = { version = "0.26.0", features = ["extension-module"] }
 faup-rs = { path = "../faup" }
+pyo3 = { version = "0.30.1", features = ["extension-module"] }
