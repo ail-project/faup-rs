@@ -134,7 +134,7 @@ impl Suffix {
 ///     >>> print(hn.subdomain)  # "sub"
 ///     >>> print(hn.domain)     # "example"
 ///     >>> print(hn.suffix)     # "com"
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct Hostname {
     hostname: String,
