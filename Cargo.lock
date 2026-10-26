@@ -166,7 +166,7 @@ checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
 
 [[package]]
 name = "pyfaup-rs"
-version = "0.4.26"
+version = "0.4.27"
 dependencies = [
  "faup-rs",
  "pyo3",
