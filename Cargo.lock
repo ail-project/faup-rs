@@ -48,7 +48,7 @@ dependencies = [
 
 [[package]]
 name = "faup-rs"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "pest",
  "pest_derive",
@@ -166,7 +166,7 @@ checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
 
 [[package]]
 name = "pyfaup-rs"
-version = "0.4.28"
+version = "0.4.29"
 dependencies = [
  "faup-rs",
  "pyo3",
