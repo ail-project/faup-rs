@@ -1707,6 +1707,18 @@ mod tests {
             _ => panic!("Expected IPv6 address"),
         }
 
+        // IPv4-mapped IPv6
+        let url = Url::parse("http://[::ffff:1.1.1.1]/favicon.ico").unwrap();
+        match url.host().unwrap() {
+            Host::IpV6(ip, _) => assert_eq!(ip, &Ipv4Addr::new(1, 1, 1, 1).to_ipv6_mapped()),
+            _ => panic!("Expected IPv6 address"),
+        }
+        assert_eq!(url.path(), Some("/favicon.ico"));
+
+        // IPv4-mapped IPv6 with invalid IPv4 part
+        let err = Url::parse("http://[::ffff:999.1.1.1]").unwrap_err();
+        assert!(matches!(err, Error::InvalidIPv6));
+
         // Invalid IPv4
         let err = Url::parse("http://999.999.999.999").unwrap_err();
         assert!(matches!(err, Error::InvalidIPv4));
